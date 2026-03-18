@@ -1,0 +1,37 @@
+# 🔐 Environment variables
+.env
+
+# 🐍 Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 📦 Virtual environment
+venv/
+env/
+.venv/
+chatbot/
+chatbot_env/
+chatbot
+# 📝 Logs
+*.log
+
+# 🗄️ Database files (if any)
+*.db
+*.sqlite3
+
+# 📂 OS files
+.DS_Store
+Thumbs.db
+
+# 🧪 Testing / temp files
+*.tmp
+*.temp
+
+# 🧰 IDE / Editor files
+.vscode/
+.idea/
+
+# 🚀 Render (optional)
+.render/
