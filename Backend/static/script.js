@@ -235,27 +235,42 @@ async function doVerifyOtp() {
 }
 
 // Restore session from localStorage on page load
+// Restore session from localStorage on page load
 (function restoreSession() {
     function doRestore() {
         try {
-            
-        if (localStorage.getItem("loggedOut") === "1") {
-            localStorage.removeItem("loggedOut");
-            return;  // skip restore, user just logged out
-        }
-        var savedEmail = localStorage.getItem("userEmail");
+            // Reset guest count if no active guest chat
+            if (!localStorage.getItem("documind_guest_chat_id")) {
+                localStorage.removeItem("documind_guest_msg_count");
+            }
+
+            if (localStorage.getItem("loggedOut") === "1") {
+                localStorage.removeItem("loggedOut");
+                return;
+            }
+
             var savedEmail = localStorage.getItem("userEmail");
             var savedMode = localStorage.getItem("loginMode") || "personal";
             if (!savedEmail) return;
+
             userEmail = savedEmail;
             loginMode = savedMode;
+
             if (savedMode === "company") {
                 applyCompanyLoginUI(savedEmail);
             } else {
                 applyPersonalLoginUI(savedEmail);
             }
+
             loadSavedProfilePhoto();
-            loadUserData(savedEmail);
+
+            var savedChat = localStorage.getItem("currentChat");
+            loadUserData(savedEmail).then(function() {
+                if (savedChat && chats.indexOf(savedChat) !== -1) {
+                    selectChat(savedChat);
+                }
+            });
+
         } catch(e) {}
     }
     if (document.readyState === "loading") {
@@ -403,6 +418,9 @@ function logout() {
     closeProfileDropdown();
     loginMode = "guest";
     userEmail = null;
+    clearGuestSession();
+try { localStorage.removeItem("currentChat"); } catch(e) {}
+
 try { 
     localStorage.removeItem("userEmail"); 
     localStorage.removeItem("loginMode"); 
@@ -720,6 +738,7 @@ async function selectChat(chatName) {
     closeSidebar();
     closeDatabaseView();
     currentChat = chatName;
+    try { localStorage.setItem("currentChat", chatName); } catch(e) {}
     document.getElementById("chatTitle").innerText = chatName;
     document.getElementById("chatArea").innerHTML = "";
     renderChats();
