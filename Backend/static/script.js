@@ -236,20 +236,27 @@ async function doVerifyOtp() {
 
 // Restore session from localStorage on page load
 (function restoreSession() {
-    try {
-        var savedEmail = localStorage.getItem("userEmail");
-        var savedMode = localStorage.getItem("loginMode") || "personal";
-        if (!savedEmail) return;
-        userEmail = savedEmail;
-        loginMode = savedMode;
-        if (savedMode === "company") {
-            applyCompanyLoginUI(savedEmail);
-        } else {
-            applyPersonalLoginUI(savedEmail);
-        }
-        loadSavedProfilePhoto();
-        loadUserData(savedEmail);
-    } catch(e) {}
+    function doRestore() {
+        try {
+            var savedEmail = localStorage.getItem("userEmail");
+            var savedMode = localStorage.getItem("loginMode") || "personal";
+            if (!savedEmail) return;
+            userEmail = savedEmail;
+            loginMode = savedMode;
+            if (savedMode === "company") {
+                applyCompanyLoginUI(savedEmail);
+            } else {
+                applyPersonalLoginUI(savedEmail);
+            }
+            loadSavedProfilePhoto();
+            loadUserData(savedEmail);
+        } catch(e) {}
+    }
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", doRestore);
+    } else {
+        doRestore();
+    }
 })();
 
 function googleLoginFromPopup() {
