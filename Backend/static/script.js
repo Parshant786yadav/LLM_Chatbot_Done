@@ -803,7 +803,7 @@ async function uploadChatDoc() {
     formData.append("mode", loginMode === "company" ? "company" : "personal");
 
     try {
-        const response = await fetch("http://localhost:8000/upload", {
+        const response = await fetch(API_BASE + "/upload", {
             method: "POST",
             body: formData
         });
@@ -1184,7 +1184,7 @@ async function sendMessage() {
     .catch(function (error) {
         console.error("Error:", error);
         removeTypingIndicator();
-        addMessage("Error: " + (error.message || "Server unreachable. Is the backend running on http://localhost:8000?"), "bot");
+        addMessage("Error: " + (error.message || "Server unreachable. Is the backend running?"), "bot");
     });
 }
 
