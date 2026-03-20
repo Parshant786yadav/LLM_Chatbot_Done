@@ -217,10 +217,12 @@ async function doVerifyOtp() {
         if (loginPopupMode === "personal") {
             loginMode = "personal";
             userEmail = email;
+            try { localStorage.setItem("userEmail", email); localStorage.setItem("loginMode", "personal"); } catch(e) {}
             applyPersonalLoginUI(email);
         } else {
             loginMode = "company";
             userEmail = email;
+            try { localStorage.setItem("userEmail", email); localStorage.setItem("loginMode", "company"); } catch(e) {}
             applyCompanyLoginUI(email);
         }
         loadSavedProfilePhoto();
@@ -231,6 +233,24 @@ async function doVerifyOtp() {
         alert("Verification failed. Check your connection.");
     }
 }
+
+// Restore session from localStorage on page load
+(function restoreSession() {
+    try {
+        var savedEmail = localStorage.getItem("userEmail");
+        var savedMode = localStorage.getItem("loginMode") || "personal";
+        if (!savedEmail) return;
+        userEmail = savedEmail;
+        loginMode = savedMode;
+        if (savedMode === "company") {
+            applyCompanyLoginUI(savedEmail);
+        } else {
+            applyPersonalLoginUI(savedEmail);
+        }
+        loadSavedProfilePhoto();
+        loadUserData(savedEmail);
+    } catch(e) {}
+})();
 
 function googleLoginFromPopup() {
     closeLoginPopup();
@@ -370,6 +390,7 @@ function logout() {
     closeProfileDropdown();
     loginMode = "guest";
     userEmail = null;
+    try { localStorage.removeItem("userEmail"); localStorage.removeItem("loginMode"); } catch(e) {}
 
     document.getElementById("loginBtn").style.display = "block";
     document.getElementById("profileBox").style.display = "none";
@@ -1514,6 +1535,7 @@ function googleLogin() {
     if (!email) return;
     userEmail = email;
     loginMode = "personal";
+    try { localStorage.setItem("userEmail", email); localStorage.setItem("loginMode", "personal"); } catch(e) {}
     document.getElementById("loginBtn").style.display = "none";
     document.getElementById("profileBox").style.display = "block";
     document.getElementById("profileName").textContent = email;
