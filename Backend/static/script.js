@@ -238,6 +238,12 @@ async function doVerifyOtp() {
 (function restoreSession() {
     function doRestore() {
         try {
+            
+        if (localStorage.getItem("loggedOut") === "1") {
+            localStorage.removeItem("loggedOut");
+            return;  // skip restore, user just logged out
+        }
+        var savedEmail = localStorage.getItem("userEmail");
             var savedEmail = localStorage.getItem("userEmail");
             var savedMode = localStorage.getItem("loginMode") || "personal";
             if (!savedEmail) return;
@@ -397,8 +403,13 @@ function logout() {
     closeProfileDropdown();
     loginMode = "guest";
     userEmail = null;
-    try { localStorage.removeItem("userEmail"); localStorage.removeItem("loginMode"); } catch(e) {}
-
+try { 
+    localStorage.removeItem("userEmail"); 
+    localStorage.removeItem("loginMode"); 
+    localStorage.setItem("loggedOut", "1");
+    sessionStorage.clear();
+} catch(e) {}
+history.replaceState({}, document.title, window.location.pathname || "/");
     document.getElementById("loginBtn").style.display = "block";
     document.getElementById("profileBox").style.display = "none";
 
@@ -443,10 +454,10 @@ var GUEST_COUNT_STORAGE_KEY = "documind_guest_msg_count";
 
 function getOrCreateGuestChatId() {
     try {
-        var id = sessionStorage.getItem(GUEST_CHAT_STORAGE_KEY);
+        var id = localStorage.getItem(GUEST_CHAT_STORAGE_KEY);
         if (id) return id;
         var uuid = "guest-" + crypto.randomUUID();
-        sessionStorage.setItem(GUEST_CHAT_STORAGE_KEY, uuid);
+        localStorage.setItem(GUEST_CHAT_STORAGE_KEY, uuid);
         return uuid;
     } catch (e) {
         return "guest-" + Date.now() + "-" + Math.random().toString(36).slice(2);
@@ -455,7 +466,7 @@ function getOrCreateGuestChatId() {
 
 function getGuestMessageCount() {
     try {
-        var n = parseInt(sessionStorage.getItem(GUEST_COUNT_STORAGE_KEY), 10);
+        var n = parseInt(localStorage.getItem(GUEST_COUNT_STORAGE_KEY), 10);
         return isNaN(n) ? 0 : n;
     } catch (e) {
         return 0;
@@ -464,21 +475,21 @@ function getGuestMessageCount() {
 
 function setGuestMessageCount(n) {
     try {
-        sessionStorage.setItem(GUEST_COUNT_STORAGE_KEY, String(n));
+        localStorage.setItem(GUEST_COUNT_STORAGE_KEY, String(n));
     } catch (e) {}
 }
 
 function clearGuestSession() {
     try {
-        sessionStorage.removeItem(GUEST_CHAT_STORAGE_KEY);
-        sessionStorage.removeItem(GUEST_COUNT_STORAGE_KEY);
+        localStorage.removeItem(GUEST_CHAT_STORAGE_KEY);
+        localStorage.removeItem(GUEST_COUNT_STORAGE_KEY);
     } catch (e) {}
 }
 
 /** If user had a guest chat, claim it so all messages get the user's display_id and chat is renamed to "Chat 1". No message reload to avoid refresh. Call after successful login. Returns true if a chat was claimed. */
 async function claimGuestChatIfAny(email) {
     try {
-        var guestChatId = sessionStorage.getItem(GUEST_CHAT_STORAGE_KEY);
+        var guestChatId = localStorage.getItem(GUEST_CHAT_STORAGE_KEY);
         if (!guestChatId) return false;
         var res = await fetch(API_BASE + "/chats/claim", {
             method: "POST",
@@ -493,6 +504,8 @@ async function claimGuestChatIfAny(email) {
         document.getElementById("chatTitle").innerText = newName;
         await loadUserData(email);
         renderChats();
+        // ← reload messages so pre-login chat shows after login
+        await loadMessagesForCurrentChat();
         return true;
     } catch (e) {
         console.error("Claim guest chat error", e);
