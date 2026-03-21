@@ -443,7 +443,9 @@ def _chat_sync(req: ChatRequest):
                 score = cosine_similarity(query_embedding, chunk_embedding)
                 scored_chunks.append((score, ch.get("content") or ""))
             scored_chunks.sort(key=lambda x: x[0], reverse=True)
+            print(f"[CHAT] Total chunks: {len(chunks)}, Top scores: {[round(s,3) for s,_ in scored_chunks[:5]]}", flush=True)
             top_chunks = [c[1] for c in scored_chunks[:5] if c[0] > 0.2]
+            print(f"[CHAT] Context chunks used: {len(top_chunks)}", flush=True)
             context = "\n\n".join(top_chunks) if top_chunks else ""
 
         system_instruction = (
