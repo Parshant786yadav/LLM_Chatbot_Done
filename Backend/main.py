@@ -198,8 +198,13 @@ app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=_TEMPLATES_DIR)
 
 
-@app.get("/", response_class=HTMLResponse)
+# @app.get("/", response_class=HTMLResponse)
+# def home(request: Request):
+#     return templates.TemplateResponse("index.html", {"request": request})
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def home(request: Request):
+    if request.method == "HEAD":
+        return Response(status_code=200)
     return templates.TemplateResponse("index.html", {"request": request})
 
 
