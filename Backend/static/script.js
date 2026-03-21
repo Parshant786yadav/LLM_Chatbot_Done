@@ -14,6 +14,22 @@ let chatDocuments = {};
 let companyDocuments = [];  // HR company docs (same-domain users access via chat only)
 var API_BASE = (window.location.protocol === "http:" || window.location.protocol === "https:") ? "" : "http://localhost:8000";
 
+/* ---------------- LOADERS ---------------- */
+function showChatListLoader() {
+    var chatList = document.getElementById("chatList");
+    if (chatList) chatList.innerHTML = '<li class="chat-list-loading"><span class="chat-loader-dot"></span><span class="chat-loader-dot"></span><span class="chat-loader-dot"></span></li>';
+}
+
+function showChatAreaLoader() {
+    var chatArea = document.getElementById("chatArea");
+    if (chatArea) chatArea.innerHTML = '<div class="chat-area-loading"><span class="chat-loader-dot"></span><span class="chat-loader-dot"></span><span class="chat-loader-dot"></span></div>';
+}
+
+function hideChatAreaLoader() {
+    var chatArea = document.getElementById("chatArea");
+    if (chatArea) chatArea.innerHTML = "";
+}
+
 /* ---------------- PROFILE DROPDOWN ---------------- */
 
 function toggleProfileDropdown(event) {
@@ -325,9 +341,9 @@ async function loadUserData(email) {
         }
 
         // Load chats
+        showChatListLoader();
         const chatRes = await fetch(API_BASE + "/chats/" + encodeURIComponent(email));
         const chatData = await chatRes.json();
-
         chats = (chatData.chats || []).map(function (c) { return typeof c === "string" ? c : c.name; });
         renderChats();
 
@@ -541,11 +557,20 @@ async function claimGuestChatIfAny(email) {
         var newName = (data.name && data.name.trim()) ? data.name.trim() : guestChatId;
         
         // Set immediately before anything else renders
+        // currentChat = newName;
+        // try { localStorage.setItem("currentChat", newName); } catch(e) {}
+        // document.getElementById("chatTitle").innerText = newName;
+        // document.getElementById("chatArea").innerHTML = "";
+        
+        // await loadUserData(email);
+        // renderChats();
+        // await loadMessagesForCurrentChat();
         currentChat = newName;
         try { localStorage.setItem("currentChat", newName); } catch(e) {}
         document.getElementById("chatTitle").innerText = newName;
-        document.getElementById("chatArea").innerHTML = "";
-        
+        showChatAreaLoader();
+        showChatListLoader();
+
         await loadUserData(email);
         renderChats();
         await loadMessagesForCurrentChat();

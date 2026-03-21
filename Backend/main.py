@@ -217,9 +217,10 @@ def _send_otp_email(to_email: str, otp: str) -> None:
     api_key = os.getenv("RESEND_API_KEY", "").strip()
     if not api_key:
         raise ValueError("RESEND_API_KEY must be set in environment")
+    from_email = os.getenv("RESEND_FROM_EMAIL", "DocuMind <onboarding@resend.dev>")
+    print(f"[OTP] Sending from: {from_email}", flush=True)
     payload = _json.dumps({
-        # "from": "DocuMind <onboarding@resend.dev>",
-        "from": os.getenv("RESEND_FROM_EMAIL", "DocuMind <onboarding@resend.dev>"),
+        "from": from_email,
         "to": [to_email],
         "subject": "OTP From DocuMind",
         "html": f"""

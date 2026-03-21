@@ -1672,3 +1672,42 @@ body {
     padding: 20px;
     color: #6b7280;
 }
+
+
+/* Chat list loader */
+.chat-list-loading {
+    display: flex;
+    gap: 6px;
+    padding: 12px 8px;
+    align-items: center;
+    justify-content: center;
+    list-style: none;
+}
+
+/* Chat area loader */
+.chat-area-loading {
+    display: flex;
+    gap: 8px;
+    padding: 40px;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Loader dots */
+.chat-loader-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4f8ef7;
+    display: inline-block;
+    animation: chatLoaderBounce 1.2s infinite ease-in-out;
+}
+.chat-loader-dot:nth-child(1) { animation-delay: 0s; }
+.chat-loader-dot:nth-child(2) { animation-delay: 0.2s; }
+.chat-loader-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes chatLoaderBounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+}
+
