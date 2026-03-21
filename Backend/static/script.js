@@ -1191,7 +1191,7 @@ async function sendMessage() {
         },
         body: JSON.stringify({
             mode: userEmail ? loginMode : "personal",
-            email: userEmail || "",
+            email: userEmail || "guest",
             chat: currentChat,
             message: message
         })
