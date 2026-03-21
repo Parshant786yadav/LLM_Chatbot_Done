@@ -91,7 +91,7 @@ def create_embeddings_batch(texts: list[str]) -> list[list[float]]:
         if result and len(result) == len(batch):
             all_embeddings.extend(result)
         else:
-            # Fallback per-item
+            # Fallback per-itemm
             all_embeddings.extend(_bow_embedding(t) for t in batch)
     return all_embeddings
 

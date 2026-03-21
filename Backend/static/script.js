@@ -213,6 +213,12 @@ async function doVerifyOtp() {
             alert(data.detail || "Invalid or expired OTP");
             return;
         }
+        // Save whatever user typed in chat before login
+        var pendingMsg = "";
+        try { 
+            var msgInput = document.getElementById("messageInput");
+            if (msgInput) pendingMsg = msgInput.value || "";
+        } catch(e) {}
         closeLoginPopup();
         if (loginPopupMode === "personal") {
             loginMode = "personal";
@@ -228,10 +234,18 @@ async function doVerifyOtp() {
         loadSavedProfilePhoto();
         var claimed = await claimGuestChatIfAny(email);
         if (!claimed) loadUserData(email);
+        // Restore pending message after login
+        try {
+            if (pendingMsg) {
+                var msgInput = document.getElementById("messageInput");
+                if (msgInput) msgInput.value = pendingMsg;
+            }
+        } catch(e) {}
     } catch (e) {
         console.error(e);
         alert("Verification failed. Check your connection.");
     }
+    
 }
 
 // Restore session from localStorage on page load
@@ -282,6 +296,13 @@ async function doVerifyOtp() {
 
 function googleLoginFromPopup() {
     closeLoginPopup();
+    // Save pending message before redirect
+    try {
+        var msgInput = document.getElementById("messageInput");
+        if (msgInput && msgInput.value) {
+            localStorage.setItem("pendingMsg", msgInput.value);
+        }
+    } catch(e) {}
     googleLogin();
 }
 
@@ -518,11 +539,15 @@ async function claimGuestChatIfAny(email) {
         var data = await res.json().catch(function () { return {}; });
         clearGuestSession();
         var newName = (data.name && data.name.trim()) ? data.name.trim() : guestChatId;
+        
+        // Set immediately before anything else renders
         currentChat = newName;
+        try { localStorage.setItem("currentChat", newName); } catch(e) {}
         document.getElementById("chatTitle").innerText = newName;
+        document.getElementById("chatArea").innerHTML = "";
+        
         await loadUserData(email);
         renderChats();
-        // ← reload messages so pre-login chat shows after login
         await loadMessagesForCurrentChat();
         return true;
     } catch (e) {
@@ -1595,8 +1620,17 @@ function googleLogin() {
     renderChatDocs();
     loadSavedProfilePhoto();
     claimGuestChatIfAny(email).then(function (claimed) {
-        if (!claimed) loadUserData(email).catch(function (e) { console.error("Error loading user data after Google login", e); });
-    });
+    if (!claimed) loadUserData(email).catch(function (e) { console.error("Error loading user data after Google login", e); });
+    // Restore pending message
+    try {
+        var pending = localStorage.getItem("pendingMsg");
+        if (pending) {
+            var msgInput = document.getElementById("messageInput");
+            if (msgInput) msgInput.value = pending;
+            localStorage.removeItem("pendingMsg");
+        }
+    } catch(e) {}
+});
     history.replaceState({}, document.title, window.location.pathname || "/");
 })();
 

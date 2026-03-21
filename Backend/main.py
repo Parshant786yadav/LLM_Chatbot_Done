@@ -20,11 +20,11 @@ from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.staticfiles import StaticFiles
 import urllib.parse
-import smtplib
+# import smtplib
 import random
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.utils import formataddr
+# from email.mime.text import MIMEText
+# from email.mime.multipart import MIMEMultipart
+# from email.utils import formataddr
 import asyncio
 import json
 from rag import cosine_similarity
@@ -212,66 +212,37 @@ SECRET_TEST_OTP = "882644"  # Secret OTP for testing; accepts login without emai
 
 
 def _send_otp_email(to_email: str, otp: str) -> None:
-    """Send OTP via Gmail SMTP. Professional HTML + plain fallback. Raises on failure."""
-    sender = os.getenv("GMAIL_OTP_EMAIL", "").strip()
-    password = os.getenv("GMAIL_OTP_APP_PASSWORD", "").strip()
-    if not sender or not password:
-        raise ValueError("GMAIL_OTP_EMAIL and GMAIL_OTP_APP_PASSWORD must be set in .env")
-
-    subject = "OTP From DocuMind"
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = formataddr(("no-reply", sender))
-    msg["To"] = to_email
-
-    # Plain text fallback
-    text = (
-        f"Your One-Time Password from DocuMind\n\n"
-        f"Your one-time password (OTP) is: {otp}\n\n"
-        f"It expires in 10 minutes. Enter this code in the app to sign in.\n\n"
-        f"If you didn't request this, please ignore this email.\n\n"
-        f"DocuMind Team"
+    """Send OTP via Resend API (works on Render - no SMTP needed)."""
+    import urllib.request, urllib.error, json as _json
+    api_key = os.getenv("RESEND_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("RESEND_API_KEY must be set in environment")
+    payload = _json.dumps({
+        # "from": "DocuMind <onboarding@resend.dev>",
+        "from": os.getenv("RESEND_FROM_EMAIL", "DocuMind <onboarding@resend.dev>"),
+        "to": [to_email],
+        "subject": "OTP From DocuMind",
+        "html": f"""
+        <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px;">
+            <h2>Your One-Time Password from DocuMind</h2>
+            <p>Your OTP is:</p>
+            <h1 style="color:#2563eb;letter-spacing:4px;">{otp}</h1>
+            <p>It expires in <strong>10 minutes</strong>.</p>
+            <p>If you didn't request this, please ignore this email.</p>
+            <p>DocuMind Team</p>
+        </div>"""
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST"
     )
-    msg.attach(MIMEText(text, "plain"))
-
-    # HTML: professional heading, prominent OTP, clean layout
-    html = f"""<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{subject}</title>
-</head>
-<body style="margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; color: #1a1a1a;">
-  <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
-    <h1 style="margin: 0 0 24px 0; font-size: 1.5rem; font-weight: 700; color: #1a1a1a; line-height: 1.3;">
-      Your One-Time Password from DocuMind
-    </h1>
-    <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #333;">
-      Your one-time password <span style="background-color: #fef08a; padding: 2px 6px; border-radius: 4px;">(OTP)</span> is:
-    </p>
-    <p style="margin: 0 0 24px 0;">
-      <strong style="font-size: 1.5rem; color: #2563eb; text-decoration: underline; letter-spacing: 2px;">{otp}</strong>
-    </p>
-    <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #333;">
-      Enter this code in the app to sign in. It expires in <strong>10 minutes</strong>.
-    </p>
-    <p style="margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #666;">
-      If you didn't request this, please ignore this email.
-    </p>
-    <p style="margin: 0; font-size: 15px; color: #333;">
-      DocuMind Team
-    </p>
-  </div>
-</body>
-</html>"""
-    msg.attach(MIMEText(html, "html"))
-
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.ehlo()
-        server.starttls()
-        server.login(sender, password)
-        server.sendmail(sender, to_email, msg.as_string())
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            resp.read()
+    except urllib.error.HTTPError as e:
+        raise ValueError(f"Resend API error: {e.read().decode()}")
 
 
 def _otp_cleanup_expired():
