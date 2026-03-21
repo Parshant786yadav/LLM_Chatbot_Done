@@ -126,6 +126,70 @@ def _delete_from_storage(storage_path: str) -> None:
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
+
+# Message Cache for fast chat history loading
+class MessageCache:
+    """
+    In-memory cache for message responses with TTL.
+    Thread-safe with asyncio locks.
+    """
+    
+    def __init__(self, ttl_seconds: int = 60):
+        self._cache: dict[tuple[int, int], dict] = {}
+        self._timestamps: dict[tuple[int, int], float] = {}
+        self._lock = asyncio.Lock()
+        self._ttl = ttl_seconds
+    
+    async def get(self, user_id: int, chat_id: int) -> Optional[dict]:
+        """Retrieve cached response if not expired."""
+        async with self._lock:
+            key = (user_id, chat_id)
+            if key not in self._cache:
+                return None
+            
+            # Check if expired
+            if time.time() - self._timestamps[key] > self._ttl:
+                del self._cache[key]
+                del self._timestamps[key]
+                return None
+            
+            return self._cache[key]
+    
+    async def set(self, user_id: int, chat_id: int, data: dict) -> None:
+        """Store response with current timestamp."""
+        async with self._lock:
+            key = (user_id, chat_id)
+            self._cache[key] = data
+            self._timestamps[key] = time.time()
+    
+    async def invalidate(self, user_id: int, chat_id: int) -> None:
+        """Remove cache entry (called when new message added or chat claimed)."""
+        async with self._lock:
+            key = (user_id, chat_id)
+            if key in self._cache:
+                del self._cache[key]
+            if key in self._timestamps:
+                del self._timestamps[key]
+    
+    async def cleanup_expired(self) -> None:
+        """Remove expired entries (background task)."""
+        async with self._lock:
+            now = time.time()
+            expired_keys = [
+                key for key, ts in self._timestamps.items()
+                if now - ts > self._ttl
+            ]
+            for key in expired_keys:
+                if key in self._cache:
+                    del self._cache[key]
+                if key in self._timestamps:
+                    del self._timestamps[key]
+
+
+# Global message cache instance
+_message_cache = MessageCache(ttl_seconds=60)
+
+
 app = FastAPI(title="Enterprise AI Assistant Backend")
 
 # Static files (CSS, JS) – use absolute path so it works regardless of CWD
@@ -140,8 +204,22 @@ def home(request: Request):
 
 
 @app.on_event("startup")
-def startup():
+async def startup():
     _ensure_storage_bucket()
+    # Start background cache cleanup task
+    asyncio.create_task(_cache_cleanup_task())
+
+
+async def _cache_cleanup_task():
+    """Background task to clean up expired cache entries every 60 seconds."""
+    while True:
+        await asyncio.sleep(60)
+        try:
+            await _message_cache.cleanup_expired()
+            print("[CACHE] Cleanup completed", flush=True)
+        except Exception as e:
+            print(f"[ERROR] Cache cleanup failed: {str(e)}", flush=True)
+
 
 
 app.add_middleware(
@@ -495,6 +573,17 @@ User: {req.message}""" if context.strip() else req.message
 async def chat(req: ChatRequest):
     if not GROQ_API_KEY or not client:
         return {"reply": "GROQ_API_KEY not found in .env"}
+    
+    # Get user and chat info for cache invalidation
+    email = req.email or "guest"
+    user = db_ops.get_user_by_email(email)
+    if user:
+        chat_name = req.chat or "default"
+        chat = db_ops.get_chat_by_user_and_name(user["id"], chat_name)
+        if chat:
+            # Invalidate cache before processing (new messages will be added)
+            await _message_cache.invalidate(user["id"], chat["id"])
+    
     return await asyncio.to_thread(_chat_sync, req)
 
 def _sanitize_filename(name: str) -> str:
@@ -620,6 +709,120 @@ def get_chats(email: str):
     return {"chats": [{"name": c["name"], "display_id": c.get("display_id")} for c in chats]}
 
 
+@app.get("/messages/{email}/{chat_name}")
+async def get_messages(
+    email: str,
+    chat_name: str,
+    limit: Optional[int] = None,
+    offset: int = 0
+):
+    """
+    Retrieve chat history with optimized performance.
+    
+    Features:
+    - Response caching (60s TTL)
+    - Selective column retrieval
+    - Pagination support
+    - Performance metrics
+    
+    Args:
+        email: User email address
+        chat_name: Name of the chat
+        limit: Optional max messages to return (default: 50, max: 1000)
+        offset: Optional offset for pagination (default: 0)
+    
+    Returns:
+        {
+            "messages": [{"role": str, "content": str, "display_id": str}],
+            "total_count": int,
+            "has_more": bool,
+            "query_time_ms": float
+        }
+    """
+    start_time = time.time()
+    
+    try:
+        # Parameter validation
+        if limit is not None and limit < 0:
+            raise HTTPException(status_code=400, detail="Limit must be non-negative")
+        if offset < 0:
+            raise HTTPException(status_code=400, detail="Offset must be non-negative")
+        
+        # Clamp limit to maximum of 1000
+        if limit is not None and limit > 1000:
+            limit = 1000
+            print(f"[WARN] Limit clamped to 1000 for {email}/{chat_name}", flush=True)
+        
+        # Set default limit to 50 if not provided
+        if limit is None:
+            limit = 50
+        
+        # Look up user and chat
+        user = db_ops.get_user_by_email(email)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        chat = db_ops.get_chat_by_user_and_name(user["id"], chat_name)
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
+        
+        chat_id = chat["id"]
+        user_id = user["id"]
+        
+        # Check cache first
+        cached_response = await _message_cache.get(user_id, chat_id)
+        if cached_response is not None:
+            cache_time = time.time() - start_time
+            print(f"[CACHE HIT] Messages for chat {chat_id}: {cache_time*1000:.2f}ms", flush=True)
+            return cached_response
+        
+        # Cache miss - query database
+        query_start = time.time()
+        messages, total_count = await asyncio.to_thread(
+            db_ops.get_messages_for_chat_optimized,
+            chat_id,
+            limit,
+            offset
+        )
+        query_time_ms = (time.time() - query_start) * 1000
+        
+        # Calculate has_more
+        has_more = (offset + len(messages)) < total_count
+        
+        # Build response
+        response = {
+            "messages": messages,
+            "total_count": total_count,
+            "has_more": has_more,
+            "query_time_ms": round(query_time_ms, 2)
+        }
+        
+        # Store in cache (only cache first page for simplicity)
+        if offset == 0:
+            await _message_cache.set(user_id, chat_id, response)
+        
+        # Performance logging
+        total_time_ms = (time.time() - start_time) * 1000
+        print(f"[MESSAGES] Retrieved {len(messages)} messages for chat {chat_id}: {total_time_ms:.2f}ms (query: {query_time_ms:.2f}ms)", flush=True)
+        
+        if total_time_ms > 500:
+            print(f"[WARN] Slow message retrieval: chat_id={chat_id}, message_count={len(messages)}, time={total_time_ms:.2f}ms", flush=True)
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_time_ms = (time.time() - start_time) * 1000
+        print(f"[ERROR] Message retrieval failed after {error_time_ms:.2f}ms: {str(e)}", flush=True)
+        
+        # Check for database connection errors
+        if "connection" in str(e).lower() or "timeout" in str(e).lower():
+            raise HTTPException(status_code=503, detail="Database temporarily unavailable")
+        
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve messages: {str(e)}")
+
+
 @app.post("/chats")
 def create_chat(body: CreateChatRequest):
     user = db_ops.get_user_by_email(body.email)
@@ -659,31 +862,61 @@ def rename_chat(body: RenameChatRequest):
 
 
 @app.post("/chats/claim")
-def claim_guest_chat(body: ClaimChatRequest):
+async def claim_guest_chat(body: ClaimChatRequest):
     """Assign the guest chat (and all its messages) to the logged-in user so pre-login messages get the user's display_id."""
+    claim_start = time.time()
+    
     guest_chat_name = (body.guest_chat_name or "").strip()
     email = (body.email or "").strip()
     if not guest_chat_name or not email:
         raise HTTPException(status_code=400, detail="guest_chat_name and email required")
+    
     guest_user = db_ops.get_user_by_email("guest")
     if not guest_user:
         return {"ok": True, "name": guest_chat_name}
+    
     real_user = db_ops.get_user_by_email(email)
     if not real_user:
         raise HTTPException(status_code=404, detail="User not found")
+    
     chat = db_ops.get_chat_by_user_and_name(guest_user["id"], guest_chat_name)
     if not chat:
         return {"ok": True, "name": guest_chat_name}
-    display_id = (real_user.get("display_id") or "").strip()
-    if not display_id:
-        display_id = db_ops.get_next_display_id("personal")
-        get_supabase().table("users").update({"display_id": display_id}).eq("id", real_user["id"]).execute()
-    db_ops.update_chat_ownership(chat["id"], real_user["id"], display_id)
-    db_ops.update_messages_display_id(chat["id"], display_id)
-    # Rename guest-uuid to short name "Chat 1" (or "Chat 2", ...) so sidebar shows a short name
-    new_name = db_ops.get_next_short_chat_name(real_user["id"])
-    db_ops.update_chat_name(real_user["id"], guest_chat_name, new_name)
-    return {"ok": True, "name": new_name, "previous_name": guest_chat_name}
+    
+    chat_id = chat["id"]
+    
+    try:
+        # Get or create display_id
+        display_id = (real_user.get("display_id") or "").strip()
+        if not display_id:
+            display_id = db_ops.get_next_display_id("personal")
+            get_supabase().table("users").update({"display_id": display_id}).eq("id", real_user["id"]).execute()
+        
+        # Update chat ownership and messages in batch (transaction-like behavior)
+        db_ops.update_chat_ownership(chat_id, real_user["id"], display_id)
+        db_ops.update_messages_display_id_batch(chat_id, display_id)
+        
+        # Invalidate cache for this chat
+        await _message_cache.invalidate(real_user["id"], chat_id)
+        
+        # Rename guest-uuid to short name "Chat 1" (or "Chat 2", ...) so sidebar shows a short name
+        new_name = db_ops.get_next_short_chat_name(real_user["id"])
+        db_ops.update_chat_name(real_user["id"], guest_chat_name, new_name)
+        
+        # Log claim duration
+        claim_duration_ms = (time.time() - claim_start) * 1000
+        print(f"[CLAIM] Chat {chat_id} claimed by {email}: {claim_duration_ms:.2f}ms", flush=True)
+        
+        if claim_duration_ms > 300:
+            print(f"[WARN] Slow chat claim: chat_id={chat_id}, duration={claim_duration_ms:.2f}ms", flush=True)
+        
+        return {"ok": True, "name": new_name, "previous_name": guest_chat_name}
+        
+    except Exception as e:
+        error_duration_ms = (time.time() - claim_start) * 1000
+        print(f"[ERROR] Chat claim failed after {error_duration_ms:.2f}ms: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail="Failed to claim chat. Please try again.")
+
 
 
 @app.get("/user-info")

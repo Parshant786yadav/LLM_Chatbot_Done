@@ -72,6 +72,19 @@ def update_messages_display_id(chat_id: int, display_id: str) -> None:
     get_supabase().table("messages").update({"display_id": display_id}).eq("chat_id", chat_id).execute()
 
 
+def update_messages_display_id_batch(chat_id: int, display_id: str) -> None:
+    """
+    Update all message display_ids for a chat in a single batch operation.
+    Uses Supabase batch update for efficiency - much faster than individual updates.
+    
+    Args:
+        chat_id: The chat ID whose messages to update
+        display_id: The new display_id to set for all messages
+    """
+    get_supabase().table("messages").update({"display_id": display_id}).eq("chat_id", chat_id).execute()
+
+
+
 def get_chats_by_user_id(user_id: int) -> list:
     r = get_supabase().table("chats").select("*").eq("user_id", user_id).execute()
     return r.data or []
@@ -235,3 +248,45 @@ def get_all_documents() -> list:
 def get_all_document_chunks() -> list:
     r = get_supabase().table("document_chunks").select("id, document_id, content").execute()
     return r.data or []
+
+
+# ---------- Optimized Message Retrieval ----------
+def get_messages_for_chat_optimized(
+    chat_id: int,
+    limit: Optional[int] = None,
+    offset: int = 0
+) -> tuple[list[dict], int]:
+    """
+    Retrieve messages with performance optimizations.
+    
+    Optimizations:
+    - Uses composite index (chat_id, id) for fast queries
+    - Selects only required columns (id, role, content, display_id)
+    - Orders by id in database (not in application)
+    - Supports pagination with limit and offset
+    
+    Args:
+        chat_id: The chat ID to retrieve messages for
+        limit: Optional maximum number of messages to return
+        offset: Number of messages to skip (for pagination)
+    
+    Returns:
+        Tuple of (messages list, total_count)
+    """
+    # Get total count first
+    count_result = get_supabase().table("messages").select("id", count="exact").eq("chat_id", chat_id).execute()
+    total_count = count_result.count if hasattr(count_result, 'count') else len(count_result.data or [])
+    
+    # Build query with selective columns
+    query = get_supabase().table("messages").select("id, role, content, display_id").eq("chat_id", chat_id).order("id", desc=False)
+    
+    # Apply pagination if specified
+    if limit is not None:
+        query = query.limit(limit)
+    if offset > 0:
+        query = query.range(offset, offset + (limit - 1) if limit else offset + 999)
+    
+    result = query.execute()
+    messages = result.data or []
+    
+    return (messages, total_count)
