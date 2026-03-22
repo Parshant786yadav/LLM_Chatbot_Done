@@ -30,6 +30,131 @@ function hideChatAreaLoader() {
     if (chatArea) chatArea.innerHTML = "";
 }
 
+function prefersReducedMotion() {
+    try {
+        return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch (e) {
+        return false;
+    }
+}
+
+function scrollChatToBottomSmooth() {
+    var el = document.getElementById("chatArea");
+    if (!el) return;
+    if (prefersReducedMotion()) {
+        el.scrollTop = el.scrollHeight;
+        return;
+    }
+    try {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    } catch (e) {
+        el.scrollTop = el.scrollHeight;
+    }
+}
+
+/* ---------------- TOASTS & CONFIRM (in-app; no browser alert/confirm) ---------------- */
+var TOAST_ICONS = {
+    success: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M20 6L9 17l-5-5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>",
+    error: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M15 9l-6 6M9 9l6 6\" stroke-linecap=\"round\"/></svg>",
+    warning: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M12 9v4M12 17h.01\" stroke-linecap=\"round\"/><path d=\"M10.3 3.2L1.8 18.5c-.5 1 .1 2.2 1.2 2.2h18c1.1 0 1.7-1.2 1.2-2.2L13.7 3.2c-.5-1-1.1-1-1.4-1s-.9 0-1.4 1z\" stroke-linejoin=\"round\"/></svg>",
+    info: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 16v-4M12 8h.01\" stroke-linecap=\"round\"/></svg>"
+};
+
+function toast(message, type) {
+    type = type || "info";
+    var container = document.getElementById("toastContainer");
+    if (!container || message == null || message === "") return;
+    var el = document.createElement("div");
+    el.className = "toast toast--" + type;
+    el.setAttribute("role", "status");
+    var iconEl = document.createElement("span");
+    iconEl.className = "toast-icon";
+    iconEl.innerHTML = TOAST_ICONS[type] || TOAST_ICONS.info;
+    var msgEl = document.createElement("span");
+    msgEl.className = "toast-message";
+    msgEl.textContent = String(message);
+    var dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.className = "toast-dismiss";
+    dismiss.setAttribute("aria-label", "Dismiss");
+    dismiss.innerHTML = "&times;";
+    el.appendChild(iconEl);
+    el.appendChild(msgEl);
+    el.appendChild(dismiss);
+    container.appendChild(el);
+    requestAnimationFrame(function () { el.classList.add("toast--visible"); });
+    var duration = type === "error" ? 6500 : 5000;
+    var timer = setTimeout(function () { removeToast(el); }, duration);
+    dismiss.onclick = function () {
+        clearTimeout(timer);
+        removeToast(el);
+    };
+}
+
+function removeToast(el) {
+    if (!el || !el.parentNode) return;
+    el.classList.remove("toast--visible");
+    el.classList.add("toast--out");
+    var ms = prefersReducedMotion() ? 0 : 280;
+    setTimeout(function () {
+        if (el.parentNode) el.parentNode.removeChild(el);
+    }, ms);
+}
+
+function confirmDialog(message, opts) {
+    opts = opts || {};
+    var confirmLabel = opts.confirmLabel || "Confirm";
+    var cancelLabel = opts.cancelLabel || "Cancel";
+    var danger = !!opts.danger;
+    return new Promise(function (resolve) {
+        var overlay = document.getElementById("confirmDialog");
+        if (!overlay) {
+            resolve(false);
+            return;
+        }
+        var msgEl = document.getElementById("confirmDialogMessage");
+        var okBtn = document.getElementById("confirmDialogOk");
+        var cancelBtn = document.getElementById("confirmDialogCancel");
+        var backdrop = overlay.querySelector(".confirm-dialog-backdrop");
+        if (!msgEl || !okBtn || !cancelBtn || !backdrop) {
+            resolve(false);
+            return;
+        }
+        msgEl.textContent = String(message);
+        okBtn.textContent = confirmLabel;
+        cancelBtn.textContent = cancelLabel;
+        okBtn.classList.remove("confirm-dialog-btn--primary", "confirm-dialog-btn--danger");
+        if (danger) {
+            okBtn.classList.add("confirm-dialog-btn--danger");
+        } else {
+            okBtn.classList.add("confirm-dialog-btn--primary");
+        }
+        var finished = false;
+        function end(val) {
+            if (finished) return;
+            finished = true;
+            overlay.classList.add("hidden");
+            overlay.setAttribute("aria-hidden", "true");
+            document.removeEventListener("keydown", onKey);
+            document.body.style.overflow = "";
+            okBtn.onclick = null;
+            cancelBtn.onclick = null;
+            backdrop.onclick = null;
+            resolve(val);
+        }
+        function onKey(e) {
+            if (e.key === "Escape") end(false);
+        }
+        okBtn.onclick = function () { end(true); };
+        cancelBtn.onclick = function () { end(false); };
+        backdrop.onclick = function () { end(false); };
+        document.addEventListener("keydown", onKey);
+        document.body.style.overflow = "hidden";
+        overlay.classList.remove("hidden");
+        overlay.setAttribute("aria-hidden", "false");
+    });
+}
+
 /* ---------------- PROFILE DROPDOWN ---------------- */
 
 function toggleProfileDropdown(event) {
@@ -86,7 +211,7 @@ function changePhoto() {
     if (!input || !input.files || !input.files.length) return;
     var file = input.files[0];
     if (!file.type || !file.type.startsWith("image/")) {
-        alert("Please choose an image file (e.g. JPG, PNG).");
+        toast("Please choose an image file (e.g. JPG, PNG).", "warning");
         input.value = "";
         return;
     }
@@ -120,12 +245,16 @@ var loginPopupMode = "personal";  // "personal" or "company"
 
 function openLoginPopup() {
     closeSidebar();
-    document.getElementById("loginPopup").style.display = "flex";
+    var popup = document.getElementById("loginPopup");
+    if (popup) popup.classList.add("is-open");
+    document.body.style.overflow = "hidden";
     showLoginStep1();
 }
 
 function closeLoginPopup() {
-    document.getElementById("loginPopup").style.display = "none";
+    var popup = document.getElementById("loginPopup");
+    if (popup) popup.classList.remove("is-open");
+    document.body.style.overflow = "";
 }
 
 function showLoginStep1() {
@@ -137,7 +266,7 @@ function resetOtpStep() {
     document.getElementById("loginOtpSection").style.display = "none";
     document.getElementById("loginOtpInput").value = "";
     var btn = document.getElementById("loginEmailBtn");
-    btn.textContent = "Send OTP";
+    btn.textContent = "Send verification code";
     btn.onclick = doSendOtp;
 }
 
@@ -145,8 +274,10 @@ function showPersonalLogin() {
     loginPopupMode = "personal";
     document.getElementById("loginStep1").style.display = "none";
     document.getElementById("loginStep2").style.display = "block";
-    document.getElementById("loginStep2Title").textContent = "Personal Login";
-    document.getElementById("loginEmailInput").placeholder = "Enter your email";
+    document.getElementById("loginStep2Title").textContent = "Personal sign in";
+    var hint = document.getElementById("loginStep2Hint");
+    if (hint) hint.textContent = "We’ll email you a one-time code — no password to remember.";
+    document.getElementById("loginEmailInput").placeholder = "you@example.com";
     document.getElementById("loginEmailInput").value = "";
     resetOtpStep();
     var input = document.getElementById("loginEmailInput");
@@ -158,8 +289,10 @@ function showCompanyLogin() {
     loginPopupMode = "company";
     document.getElementById("loginStep1").style.display = "none";
     document.getElementById("loginStep2").style.display = "block";
-    document.getElementById("loginStep2Title").textContent = "Company Login";
-    document.getElementById("loginEmailInput").placeholder = "name@company.com";
+    document.getElementById("loginStep2Title").textContent = "Company sign in";
+    var hint = document.getElementById("loginStep2Hint");
+    if (hint) hint.textContent = "Use your work email. We’ll send a code to verify your organization.";
+    document.getElementById("loginEmailInput").placeholder = "you@company.com";
     document.getElementById("loginEmailInput").value = "";
     resetOtpStep();
     var input = document.getElementById("loginEmailInput");
@@ -170,7 +303,7 @@ function showCompanyLogin() {
 async function doSendOtp() {
     var email = (document.getElementById("loginEmailInput").value || "").trim();
     if (!email || !email.includes("@")) {
-        alert(loginPopupMode === "company" ? "Enter valid company email" : "Enter valid email");
+        toast(loginPopupMode === "company" ? "Enter a valid company email." : "Enter a valid email.", "warning");
         return;
     }
     var btn = document.getElementById("loginEmailBtn");
@@ -184,13 +317,13 @@ async function doSendOtp() {
         });
         var data = await res.json().catch(function () { return {}; });
         if (!res.ok) {
-            alert(data.detail || "Failed to send OTP");
+            toast(data.detail || "Failed to send OTP.", "error");
             btn.disabled = false;
-            btn.textContent = "Send OTP";
+            btn.textContent = "Send verification code";
             return;
         }
         document.getElementById("loginOtpSection").style.display = "block";
-        btn.textContent = "Resend OTP";
+        btn.textContent = "Resend code";
         btn.onclick = doSendOtp;
         btn.disabled = false;
         document.getElementById("loginOtpInput").value = "";
@@ -201,9 +334,9 @@ async function doSendOtp() {
         };
     } catch (e) {
         console.error(e);
-        alert("Failed to send OTP. Check your connection.");
+        toast("Failed to send OTP. Check your connection.", "error");
         btn.disabled = false;
-        btn.textContent = "Send OTP";
+        btn.textContent = "Send verification code";
     }
 }
 
@@ -211,11 +344,11 @@ async function doVerifyOtp() {
     var email = (document.getElementById("loginEmailInput").value || "").trim();
     var otp = (document.getElementById("loginOtpInput").value || "").trim();
     if (!email || !email.includes("@")) {
-        alert("Enter valid email first.");
+        toast("Enter a valid email first.", "warning");
         return;
     }
     if (!otp || otp.length < 4) {
-        alert("Enter the 6-digit OTP from your email.");
+        toast("Enter the 6-digit code from your email.", "warning");
         return;
     }
     try {
@@ -226,7 +359,7 @@ async function doVerifyOtp() {
         });
         var data = await res.json().catch(function () { return {}; });
         if (!res.ok) {
-            alert(data.detail || "Invalid or expired OTP");
+            toast(data.detail || "Invalid or expired code.", "error");
             return;
         }
         // Save whatever user typed in chat before login
@@ -259,7 +392,7 @@ async function doVerifyOtp() {
         } catch(e) {}
     } catch (e) {
         console.error(e);
-        alert("Verification failed. Check your connection.");
+        toast("Verification failed. Check your connection.", "error");
     }
     
 }
@@ -655,12 +788,12 @@ async function createNewChatAndReturnName() {
 
 async function createChat() {
     if (!userEmail) {
-        alert("Please sign in first");
+        toast("Please sign in first.", "info");
         return;
     }
     var chatName = await createNewChatAndReturnName();
     if (!chatName) {
-        alert("Failed to create chat. Is the backend running?");
+        toast("Could not create chat. Is the backend running?", "error");
         return;
     }
     renderChats();
@@ -787,11 +920,11 @@ async function renameChatOnServer(oldName, newName) {
             renderChats();
         } else {
             const msg = Array.isArray(data.detail) ? data.detail.map(function (x) { return x.msg || x; }).join(" ") : (data.detail || "Rename failed");
-            alert(msg);
+            toast(msg, "error");
         }
     } catch (err) {
         console.error("Rename error", err);
-        alert("Rename failed. Is the backend running?");
+        toast("Rename failed. Is the backend running?", "error");
     }
 }
 
@@ -859,12 +992,12 @@ function uploadGlobal() {
 
 async function uploadChatDoc() {
     if (!userEmail) {
-        alert("Please login to upload documents");
+        toast("Please sign in to upload documents.", "info");
         return;
     }
     if (loginMode !== "personal") return;
     if (!currentChat) {
-        alert("Select a chat first");
+        toast("Select a chat first.", "info");
         return;
     }
     const fileInput = document.getElementById("chatUpload");
@@ -872,7 +1005,7 @@ async function uploadChatDoc() {
     if (!file) return;
     var ok = file.type === "application/pdf" || (file.type && file.type.indexOf("image/") === 0);
     if (!ok) {
-        alert("Only PDF and images (JPG, PNG, GIF, etc.) are supported");
+        toast("Only PDF and images (JPG, PNG, GIF, etc.) are supported.", "warning");
         return;
     }
 
@@ -889,17 +1022,17 @@ async function uploadChatDoc() {
         });
         const data = await response.json();
         if (data.error) {
-            alert(data.error);
+            toast(data.error, "error");
             return;
         }
         chatDocuments[currentChat] = chatDocuments[currentChat] || [];
         chatDocuments[currentChat].push({ id: data.document_id, name: file.name, file: file, has_preview: true });
         renderChatDocs();
         fileInput.value = "";
-        if (data.message) alert(data.message);
+        if (data.message) toast(data.message, "success");
     } catch (err) {
         console.error("Chat document upload error:", err);
-        alert("Upload failed. Is the backend running?");
+        toast("Upload failed. Is the backend running?", "error");
     }
 }
 
@@ -916,7 +1049,7 @@ function openDocPreview(doc) {
         setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 60000);
         return;
     }
-    alert("Preview is not available for this document.");
+    toast("Preview is not available for this document.", "info");
 }
 
 function toggleGlobalDocsList() {
@@ -965,22 +1098,23 @@ function renderGlobalDocs() {
 }
 
 async function removeGlobalDoc(docId) {
-    if (!confirm("Do you want to remove this document?")) return;
+    if (!(await confirmDialog("Remove this document from your library?", { confirmLabel: "Remove", cancelLabel: "Cancel", danger: true }))) return;
     if (!userEmail) return;
     try {
         var res = await fetch(API_BASE + "/documents/" + docId + "?email=" + encodeURIComponent(userEmail), { method: "DELETE" });
         if (!res.ok) {
             var data = await res.json().catch(function () { return {}; });
-            alert(data.detail || "Could not delete document");
+            toast(data.detail || "Could not delete document.", "error");
             return;
         }
     } catch (e) {
         console.error(e);
-        alert("Could not delete document");
+        toast("Could not delete document.", "error");
         return;
     }
     globalDocuments = globalDocuments.filter(function (d) { return d.id !== docId; });
     renderGlobalDocs();
+    toast("Document removed.", "success");
 }
 
 function toggleCompanyDocsList() {
@@ -1024,22 +1158,23 @@ function renderCompanyDocs() {
 }
 
 async function removeCompanyDoc(docId) {
-    if (!confirm("Do you want to remove this document?")) return;
+    if (!(await confirmDialog("Remove this company document?", { confirmLabel: "Remove", cancelLabel: "Cancel", danger: true }))) return;
     if (!userEmail) return;
     try {
         var res = await fetch(API_BASE + "/documents/" + docId + "?email=" + encodeURIComponent(userEmail), { method: "DELETE" });
         if (!res.ok) {
             var data = await res.json().catch(function () { return {}; });
-            alert(data.detail || "Could not delete document");
+            toast(data.detail || "Could not delete document.", "error");
             return;
         }
     } catch (e) {
         console.error(e);
-        alert("Could not delete document");
+        toast("Could not delete document.", "error");
         return;
     }
     companyDocuments = companyDocuments.filter(function (d) { return d.id !== docId; });
     renderCompanyDocs();
+    toast("Document removed.", "success");
 }
 
 async function toggleCompanyShowCountToEmployees() {
@@ -1053,13 +1188,13 @@ async function toggleCompanyShowCountToEmployees() {
         });
         if (!res.ok) {
             var data = await res.json().catch(function () { return {}; });
-            alert(data.detail || "Could not update setting");
+            toast(data.detail || "Could not update setting.", "error");
             check.checked = !check.checked;
         }
     } catch (e) {
         console.error(e);
         check.checked = !check.checked;
-        alert("Could not update setting");
+        toast("Could not update setting.", "error");
     }
 }
 
@@ -1133,22 +1268,23 @@ function renderChatDocs() {
 }
 
 async function removeChatDoc(docId) {
-    if (!confirm("Do you want to remove this document?")) return;
+    if (!(await confirmDialog("Remove this document from the current chat?", { confirmLabel: "Remove", cancelLabel: "Cancel", danger: true }))) return;
     if (!currentChat || !userEmail) return;
     try {
         var res = await fetch(API_BASE + "/documents/" + docId + "?email=" + encodeURIComponent(userEmail), { method: "DELETE" });
         if (!res.ok) {
             var data = await res.json().catch(function () { return {}; });
-            alert(data.detail || "Could not delete document");
+            toast(data.detail || "Could not delete document.", "error");
             return;
         }
     } catch (e) {
         console.error(e);
-        alert("Could not delete document");
+        toast("Could not delete document.", "error");
         return;
     }
     chatDocuments[currentChat] = (chatDocuments[currentChat] || []).filter(function (d) { return d.id !== docId; });
     renderChatDocs();
+    toast("Document removed from chat.", "success");
 }
 
 /* ---------------- SEND MESSAGE ---------------- */
@@ -1189,7 +1325,7 @@ async function sendMessage() {
         } else {
             var newName = await createNewChatAndReturnName();
             if (!newName) {
-                alert("Could not create chat. Is the backend running?");
+                toast("Could not create chat. Is the backend running?", "error");
                 return;
             }
             currentChat = newName;
@@ -1205,7 +1341,7 @@ async function sendMessage() {
 
     if (!userEmail && getGuestMessageCount() >= 2) {
         openLoginPopup();
-        alert("Please Login to continue...");
+        toast("Please sign in to continue chatting.", "info");
         return;
     }
 
@@ -1214,8 +1350,7 @@ async function sendMessage() {
     if (!document.getElementById("chatContainer").classList.contains("has-messages")) {
         showChatView();
         requestAnimationFrame(function () {
-            var area = document.getElementById("chatArea");
-            if (area) area.scrollTop = area.scrollHeight;
+            scrollChatToBottomSmooth();
         });
     }
     addTypingIndicator();
@@ -1272,7 +1407,7 @@ function addTypingIndicator() {
     var chatArea = document.getElementById("chatArea");
     if (!chatArea) return;
     var wrapper = document.createElement("div");
-    wrapper.className = "typing-indicator-wrapper";
+    wrapper.className = "typing-indicator-wrapper message-row";
     wrapper.setAttribute("data-typing", "1");
     wrapper.style.display = "flex";
     wrapper.style.alignItems = "flex-start";
@@ -1286,7 +1421,7 @@ function addTypingIndicator() {
     wrapper.appendChild(avatar);
     wrapper.appendChild(messageDiv);
     chatArea.appendChild(wrapper);
-    chatArea.scrollTop = chatArea.scrollHeight;
+    scrollChatToBottomSmooth();
 }
 
 function removeTypingIndicator() {
@@ -1298,6 +1433,7 @@ function addMessage(text, role) {
     const chatArea = document.getElementById("chatArea");
 
     const wrapper = document.createElement("div");
+    wrapper.className = "message-row";
     wrapper.style.display = "flex";
     wrapper.style.alignItems = "flex-start";
     wrapper.style.marginBottom = "10px";
@@ -1326,7 +1462,7 @@ function addMessage(text, role) {
     }
 
     chatArea.appendChild(wrapper);
-    chatArea.scrollTop = chatArea.scrollHeight;
+    scrollChatToBottomSmooth();
 }
 
 async function uploadDocument() {
@@ -1335,12 +1471,12 @@ async function uploadDocument() {
     const file = fileInput.files[0];
 
     if (!file) {
-        alert("Please select a file first");
+        toast("Please select a file first.", "info");
         return;
     }
 
     if (!userEmail) {
-        alert("Please login to upload documents");
+        toast("Please sign in to upload documents.", "info");
         return;
     }
 
@@ -1367,12 +1503,12 @@ async function uploadDocument() {
         }
 
         if (!response.ok) {
-            alert(data.detail || data.error || "Upload failed");
+            toast(data.detail || data.error || "Upload failed.", "error");
             fileInput.value = "";
             return;
         }
         if (data.error) {
-            alert(data.error);
+            toast(data.error, "error");
             fileInput.value = "";
             return;
         }
@@ -1385,14 +1521,14 @@ async function uploadDocument() {
                 companyDocuments.push({ id: data.document_id, name: file.name, has_preview: true });
                 renderCompanyDocs();
             }
-            alert("Document uploaded. Everyone with your company email domain can ask questions about it in chat.");
+            toast("Document uploaded and processed. Colleagues on your company domain can ask about it in chat.", "success");
         } else {
-            alert(data.message || "Uploaded");
+            toast(data.message || "Document uploaded and processed.", "success");
         }
         fileInput.value = "";
     } catch (error) {
         console.error("Upload error:", error);
-        alert("Upload failed. Check the console and that the backend is running.");
+        toast("Upload failed. Check the console and that the backend is running.", "error");
     }
 }
 
@@ -1419,7 +1555,7 @@ async function fetchDatabaseAndAdmins() {
     try {
         var dbRes = await fetch(API_BASE + "/admin/database?email=" + encodeURIComponent(userEmail));
         if (!dbRes.ok) {
-            alert("Admin access denied or error loading data.");
+            toast("Admin access denied or error loading data.", "error");
             return;
         }
         dbData = await dbRes.json();
@@ -1445,7 +1581,7 @@ async function fetchDatabaseAndAdmins() {
         setupDbSearch();
     } catch (e) {
         console.error("Error loading admin data", e);
-        alert("Could not load database. Is the backend running?");
+        toast("Could not load database. Is the backend running?", "error");
     }
 }
 
@@ -1525,7 +1661,7 @@ async function addAdminEmail() {
     if (!input || !userEmail) return;
     var newEmail = (input.value || "").trim();
     if (!newEmail || !newEmail.includes("@")) {
-        alert("Enter a valid email address.");
+        toast("Enter a valid email address.", "warning");
         return;
     }
     try {
@@ -1536,15 +1672,15 @@ async function addAdminEmail() {
         });
         var data = await res.json().catch(function () { return {}; });
         if (!res.ok) {
-            alert(data.detail || "Failed to add admin");
+            toast(data.detail || "Failed to add admin.", "error");
             return;
         }
         input.value = "";
         renderAdminListWithRemove(data.admins || [], true);
-        alert(data.message || "Admin added.");
+        toast(data.message || "Admin added.", "success");
     } catch (e) {
         console.error("Add admin error", e);
-        alert("Failed to add admin.");
+        toast("Failed to add admin.", "error");
     }
 }
 
@@ -1585,7 +1721,7 @@ function renderAdminListWithRemove(admins, showRemoveButtons) {
 
 async function removeAdminEmail(emailToRemove) {
     if (!userEmail || !emailToRemove) return;
-    if (!confirm("Remove " + emailToRemove + " from admins?")) return;
+    if (!(await confirmDialog("Remove " + emailToRemove + " from admins?", { confirmLabel: "Remove", cancelLabel: "Cancel", danger: true }))) return;
     try {
         var res = await fetch(API_BASE + "/admin/admins/remove", {
             method: "POST",
@@ -1594,11 +1730,11 @@ async function removeAdminEmail(emailToRemove) {
         });
         var data = await res.json().catch(function () { return {}; });
         if (!res.ok) {
-            alert(data.detail || "Failed to remove admin");
+            toast(data.detail || "Failed to remove admin.", "error");
             return;
         }
         renderAdminListWithRemove(data.admins || [], true);
-        alert(data.message || "Admin removed.");
+        toast(data.message || "Admin removed.", "success");
         if ((data.admins || []).indexOf(userEmail) === -1) {
             userIsAdmin = false;
             var adminSec = document.getElementById("adminSection");
@@ -1607,7 +1743,7 @@ async function removeAdminEmail(emailToRemove) {
         }
     } catch (e) {
         console.error("Remove admin error", e);
-        alert("Failed to remove admin.");
+        toast("Failed to remove admin.", "error");
     }
 }
 
@@ -1627,7 +1763,7 @@ function googleLogin() {
     var message = params.get("message");
     if (error === "oauth" && message) {
         try { message = decodeURIComponent(message); } catch (e) {}
-        alert(message);
+        toast(message, "error");
         history.replaceState({}, document.title, window.location.pathname || "/");
         return;
     }

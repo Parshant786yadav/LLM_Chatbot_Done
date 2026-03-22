@@ -158,34 +158,80 @@
 </div>
 
 <!-- LOGIN POPUP -->
-<div id="loginPopup" class="popup">
+<div id="loginPopup" class="popup" role="dialog" aria-modal="true" aria-labelledby="loginPopupHeading">
     <div class="popup-box login-popup-box">
-        <div id="loginStep1">
-            <h3>How do you want to login?</h3>
-            <button type="button" class="popup-choice-btn" onclick="showPersonalLogin()">Login as Personal</button>
-            <button type="button" class="popup-choice-btn" onclick="showCompanyLogin()">Login as Company</button>
+        <button type="button" class="login-popup-icon-close" onclick="closeLoginPopup()" aria-label="Close" title="Close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+        <div class="login-popup-hero">
+            <div class="login-popup-logo" aria-hidden="true">DM</div>
+            <h2 id="loginPopupHeading" class="login-popup-brand-title">DocuMind</h2>
+            <p class="login-popup-brand-line">Sign in to continue to your workspace</p>
         </div>
-        <div id="loginStep2" style="display: none;">
-            <button type="button" class="popup-back-btn" onclick="showLoginStep1()">← Back</button>
-            <h3 id="loginStep2Title">Personal Login</h3>
-            <input type="email" id="loginEmailInput" placeholder="Enter your email" class="login-popup-input">
-            <button type="button" id="loginEmailBtn" class="popup-email-login-btn">Send OTP</button>
+        <div class="login-popup-body">
+        <div id="loginStep1" class="login-popup-step">
+            <p class="login-popup-step-label">Choose how you want to sign in</p>
+            <div class="login-popup-choices">
+                <button type="button" class="login-choice-card" onclick="showPersonalLogin()">
+                    <span class="login-choice-icon login-choice-icon--personal" aria-hidden="true">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </span>
+                    <span class="login-choice-text">
+                        <span class="login-choice-title">Personal</span>
+                        <span class="login-choice-desc">Your own documents &amp; chats</span>
+                    </span>
+                    <span class="login-choice-chevron" aria-hidden="true">›</span>
+                </button>
+                <button type="button" class="login-choice-card" onclick="showCompanyLogin()">
+                    <span class="login-choice-icon login-choice-icon--company" aria-hidden="true">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V8l4-2v15M9 21V4h10v17M14 21v-4h2v4"/></svg>
+                    </span>
+                    <span class="login-choice-text">
+                        <span class="login-choice-title">Company</span>
+                        <span class="login-choice-desc">Shared org documents &amp; HR uploads</span>
+                    </span>
+                    <span class="login-choice-chevron" aria-hidden="true">›</span>
+                </button>
+            </div>
+        </div>
+        <div id="loginStep2" class="login-popup-step" style="display: none;">
+            <button type="button" class="popup-back-btn" onclick="showLoginStep1()">
+                <span class="popup-back-icon" aria-hidden="true">‹</span> Back
+            </button>
+            <h3 id="loginStep2Title" class="login-step2-heading">Personal sign in</h3>
+            <p class="login-step2-hint" id="loginStep2Hint">We’ll email you a one-time code — no password to remember.</p>
+            <label class="login-field-label" for="loginEmailInput">Email</label>
+            <input type="email" id="loginEmailInput" placeholder="you@example.com" class="login-popup-input" autocomplete="email">
+            <button type="button" id="loginEmailBtn" class="popup-email-login-btn">Send verification code</button>
             <div id="loginOtpSection" class="login-otp-section" style="display: none;">
-                <p class="login-otp-msg">OTP sent to your email. Enter it below.</p>
-                <input type="text" id="loginOtpInput" placeholder="Enter 6-digit OTP" class="login-popup-input" maxlength="6" inputmode="numeric" pattern="[0-9]*">
-                <button type="button" id="loginVerifyOtpBtn" class="popup-email-login-btn">Verify OTP</button>
+                <p class="login-otp-msg">Enter the 6-digit code we sent to your inbox.</p>
+                <label class="login-field-label" for="loginOtpInput">One-time code</label>
+                <input type="text" id="loginOtpInput" placeholder="• • • • • •" class="login-popup-input login-popup-input--otp" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
+                <button type="button" id="loginVerifyOtpBtn" class="popup-email-login-btn">Verify &amp; sign in</button>
             </div>
             <div class="login-popup-or">
                 <span class="login-popup-or-line"></span>
-                <span class="login-popup-or-text">or</span>
+                <span class="login-popup-or-text">or continue with</span>
                 <span class="login-popup-or-line"></span>
             </div>
             <button type="button" id="loginGoogleBtn" class="popup-google-btn" onclick="googleLoginFromPopup()">
                 <span class="popup-google-icon" aria-hidden="true"><svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg></span>
-                <span>Continue with Google</span>
+                <span>Google</span>
             </button>
         </div>
-        <button type="button" class="close-btn popup-close-btn" onclick="closeLoginPopup()">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer" class="toast-container" aria-live="polite"></div>
+<div id="confirmDialog" class="confirm-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="confirmDialogMessage" aria-hidden="true">
+    <div class="confirm-dialog-backdrop"></div>
+    <div class="confirm-dialog-box">
+        <p id="confirmDialogMessage" class="confirm-dialog-message"></p>
+        <div class="confirm-dialog-actions">
+            <button type="button" class="confirm-dialog-btn confirm-dialog-cancel" id="confirmDialogCancel">Cancel</button>
+            <button type="button" class="confirm-dialog-btn confirm-dialog-ok confirm-dialog-btn--primary" id="confirmDialogOk">Confirm</button>
+        </div>
     </div>
 </div>
 

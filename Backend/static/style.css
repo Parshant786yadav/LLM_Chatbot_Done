@@ -23,10 +23,25 @@
     font-size: 12px;
     color: #ccc;
 }
+html {
+    scroll-behavior: smooth;
+}
+
 body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: #fff;
+}
+
+/* Softer taps, consistent micro-interactions */
+button,
+a,
+input,
+textarea,
+select,
+.sidebar-toggle,
+[role="button"] {
+    -webkit-tap-highlight-color: transparent;
 }
 
 .layout {
@@ -42,6 +57,8 @@ body {
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
 }
 
 .sidebar h2 {
@@ -58,6 +75,11 @@ body {
     border-radius: 10px;
     font-size: 14px;
     font-weight: 500;
+    transition: background 0.22s ease, transform 0.12s ease, box-shadow 0.22s ease;
+}
+
+.sidebar button:active {
+    transform: scale(0.98);
 }
 
 .section {
@@ -147,7 +169,7 @@ body {
 }
 
 .chat-menu-dropdown {
-    display: none;
+    display: block;
     position: absolute;
     top: 100%;
     right: 0;
@@ -159,10 +181,18 @@ body {
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     z-index: 50;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
 }
 
 .chat-menu-dropdown.open {
-    display: block;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
 }
 
 .chat-menu-rename {
@@ -311,6 +341,8 @@ body {
     font-size: 13px;
     max-height: 180px;
     overflow-y: auto;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
     transition: max-height 0.2s ease-out;
 }
 
@@ -415,6 +447,15 @@ body {
     cursor: pointer;
     border-radius: 8px;
     flex-shrink: 0;
+    transition: background 0.2s ease, transform 0.12s ease;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.sidebar-toggle:active {
+    transform: scale(0.96);
 }
 
 .sidebar-toggle-icon {
@@ -712,7 +753,7 @@ body {
     }
 
     .chat-docs-mobile-dropdown {
-        display: none;
+        display: block;
         position: absolute;
         top: 100%;
         right: 0;
@@ -724,10 +765,18 @@ body {
         border-radius: 10px;
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
         z-index: 50;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translateY(-6px);
+        transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;
     }
 
     .chat-docs-mobile-dropdown.open {
-        display: block;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transform: translateY(0);
     }
 
     .chat-docs-mobile-upload-btn {
@@ -1010,6 +1059,8 @@ body {
     font-size: 12px;
     max-height: 120px;
     overflow-y: auto;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
     transition: max-height 0.2s ease-out;
 }
 
@@ -1048,6 +1099,23 @@ body {
     min-height: 0;
     padding: 20px;
     overflow-y: auto;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+}
+
+.message-row {
+    animation: messageRowIn 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes messageRowIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .message-avatar {
@@ -1127,128 +1195,391 @@ body {
 .popup {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.5);
-    display: none;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.45);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    display: flex;
     justify-content: center;
     align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.28s;
+}
+.popup.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+.popup .popup-box {
+    transform: scale(0.94) translateY(16px);
+    opacity: 0;
+    transition: transform 0.32s cubic-bezier(0.34, 1.15, 0.64, 1), opacity 0.28s ease;
+}
+.popup.is-open .popup-box {
+    transform: scale(1) translateY(0);
+    opacity: 1;
 }
 
 .popup-box {
-    background: white;
-    padding: 25px;
-    border-radius: 8px;
-    width: 300px;
+    position: relative;
+    background: #fff;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 400px;
+    text-align: left;
+    box-shadow:
+        0 25px 50px -12px rgba(15, 23, 42, 0.28),
+        0 0 0 1px rgba(15, 23, 42, 0.06);
+    overflow: hidden;
+}
+
+/* Login modal — professional card layout */
+.login-popup-box {
+    padding: 0;
+    max-width: 400px;
+}
+
+.login-popup-icon-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 2;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.12s ease;
+}
+
+.login-popup-icon-close:hover {
+    background: rgba(15, 23, 42, 0.06);
+    color: #0f172a;
+}
+
+.login-popup-icon-close:active {
+    transform: scale(0.96);
+}
+
+.login-popup-hero {
+    padding: 28px 48px 22px 24px;
+    background: linear-gradient(165deg, #f8fafc 0%, #eff6ff 45%, #f1f5f9 100%);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.35);
     text-align: center;
 }
 
-.popup-box button {
-    margin-top: 8px;
-    padding: 8px;
-    width: 100%;
-}
-
-.close-btn {
-    background: red;
-    color: white;
-}
-
-/* Login popup: step 1 (choice) and step 2 (email + Google) */
-.login-popup-box {
-    width: 320px;
-}
-.login-popup-box h3 {
-    margin: 0 0 16px;
-    font-size: 18px;
-}
-.popup-choice-btn {
-    display: block;
-    width: 100%;
-    margin-bottom: 10px;
-    padding: 12px 16px;
+.login-popup-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 14px;
+    border-radius: 14px;
     font-size: 15px;
-    background: #2563eb;
-    color: white;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #fff;
+    background: linear-gradient(145deg, #3b82f6 0%, #1d4ed8 55%, #1e40af 100%);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.login-popup-brand-title {
+    margin: 0;
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #0f172a;
+}
+
+.login-popup-brand-line {
+    margin: 8px 0 0;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: #64748b;
+}
+
+.login-popup-body {
+    padding: 22px 24px 26px;
+}
+
+.login-popup-step-label {
+    margin: 0 0 14px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+}
+
+.login-popup-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.login-choice-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 14px 16px;
+    text-align: left;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    cursor: pointer;
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.15s ease;
+}
+
+.login-choice-card:hover {
+    border-color: #93c5fd;
+    background: #f8fafc;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+.login-choice-card:active {
+    transform: scale(0.99);
+}
+
+.login-choice-icon {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    color: #2563eb;
+    background: #eff6ff;
+}
+
+.login-choice-icon--company {
+    color: #0d9488;
+    background: #ccfbf1;
+}
+
+.login-choice-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.login-choice-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.login-choice-desc {
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    color: #64748b;
+}
+
+.login-choice-chevron {
+    flex-shrink: 0;
+    font-size: 1.25rem;
+    font-weight: 300;
+    color: #94a3b8;
+    line-height: 1;
+}
+
+.login-step2-heading {
+    margin: 0 0 8px;
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+}
+
+.login-step2-hint {
+    margin: 0 0 18px;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: #64748b;
+}
+
+.login-field-label {
+    display: block;
+    margin: 0 0 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+}
+
+#loginStep1,
+#loginStep2 {
+    animation: loginStepFade 0.28s ease;
+}
+@keyframes loginStepFade {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.popup-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 0 16px;
+    padding: 6px 10px 6px 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    background: transparent;
+    color: #64748b;
     border: none;
     border-radius: 8px;
     cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
 }
-.popup-choice-btn:hover {
-    background: #1d4ed8;
+
+.popup-back-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+    opacity: 0.85;
 }
-.popup-back-btn {
-    display: block;
-    width: 100%;
-    margin-bottom: 12px;
-    padding: 6px 0;
-    font-size: 14px;
-    background: transparent;
-    color: #6b7280;
-    border: none;
-    cursor: pointer;
-    text-align: left;
-}
+
 .popup-back-btn:hover {
-    color: #111;
+    background: #f1f5f9;
+    color: #0f172a;
 }
+
 .login-popup-input {
     display: block;
     width: 100%;
     box-sizing: border-box;
-    padding: 10px 12px;
-    margin-bottom: 10px;
-    font-size: 15px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    font-size: 0.9375rem;
+    color: #0f172a;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #fff;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
+
+.login-popup-input::placeholder {
+    color: #94a3b8;
+}
+
+.login-popup-input:hover {
+    border-color: #cbd5e1;
+}
+
+.login-popup-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.login-popup-input--otp {
+    letter-spacing: 0.35em;
+    font-weight: 600;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
 .popup-email-login-btn {
     display: block;
     width: 100%;
-    padding: 10px 16px;
-    font-size: 15px;
-    background: #2563eb;
-    color: white;
+    padding: 12px 18px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
     border: none;
-    border-radius: 6px;
+    border-radius: 10px;
     cursor: pointer;
     margin-bottom: 4px;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+    transition: background 0.2s ease, transform 0.12s ease, box-shadow 0.2s ease;
 }
-.popup-email-login-btn:hover {
-    background: #1d4ed8;
+
+.popup-email-login-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
 }
+
+.popup-email-login-btn:active:not(:disabled) {
+    transform: scale(0.99);
+}
+
+.popup-email-login-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
 .login-popup-or {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin: 16px 0;
+    margin: 20px 0 16px;
 }
 .login-popup-or-line {
     flex: 1;
     height: 1px;
-    background: #e5e7eb;
+    background: linear-gradient(90deg, transparent, #e2e8f0 20%, #e2e8f0 80%, transparent);
 }
 .login-popup-or-text {
-    font-size: 13px;
-    color: #6b7280;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
 }
+
 .popup-google-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+    gap: 12px;
     width: 100%;
-    padding: 10px 16px;
-    font-size: 15px;
+    padding: 11px 18px;
+    font-size: 0.9375rem;
+    font-weight: 600;
     background: #fff;
-    color: #374151;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.12s ease, box-shadow 0.2s ease;
 }
+
 .popup-google-btn:hover {
-    background: #f9fafb;
-    border-color: #9ca3af;
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
+
+.popup-google-btn:active {
+    transform: scale(0.99);
+}
+
 .popup-google-icon {
     display: inline-flex;
     flex-shrink: 0;
@@ -1256,22 +1587,48 @@ body {
 .popup-google-icon svg {
     display: block;
 }
-.popup-close-btn {
-    margin-top: 16px;
-}
 
 .login-otp-section {
-    margin-top: 14px;
-    padding-top: 14px;
-    border-top: 1px solid #e5e7eb;
+    margin-top: 18px;
+    padding: 18px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
 }
+
 .login-otp-msg {
-    margin: 0 0 10px;
-    font-size: 14px;
-    color: #374151;
+    margin: 0 0 14px;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: #475569;
 }
+
+.login-otp-section .login-field-label {
+    margin-top: 4px;
+}
+
 .login-otp-section .login-popup-input {
-    margin-bottom: 10px;
+    margin-bottom: 12px;
+    background: #fff;
+}
+
+@media (max-width: 420px) {
+    .login-popup-hero {
+        padding: 24px 44px 20px 20px;
+    }
+
+    .login-popup-body {
+        padding: 18px 16px 22px;
+    }
+
+    .login-choice-card {
+        padding: 12px 14px;
+    }
+
+    .login-choice-icon {
+        width: 40px;
+        height: 40px;
+    }
 }
 
 .user-info {
@@ -1389,7 +1746,7 @@ body {
 }
 
 .profile-dropdown {
-    display: none;
+    display: block;
     position: absolute;
     top: calc(100% + 6px);
     left: 0;
@@ -1402,10 +1759,18 @@ body {
     border: 1px solid #e5e7eb;
     z-index: 100;
     min-width: 180px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-6px);
+    transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;
 }
 
 .profile-box.open .profile-dropdown {
-    display: block;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
 }
 
 .profile-dropdown-item {
@@ -1484,18 +1849,33 @@ body {
     border: none;
     border-radius: 5px;
     cursor: pointer;
+    transition: background 0.2s ease, transform 0.12s ease;
 }
 .admin-db-btn:hover {
     background: #4b5563;
+}
+.admin-db-btn:active {
+    transform: scale(0.98);
 }
 
 .database-view {
     flex: 1;
     min-height: 0;
     padding: 20px;
-    display: flex;
+    display: none;
     flex-direction: column;
     overflow: hidden;
+    animation: databaseViewIn 0.32s ease;
+}
+@keyframes databaseViewIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 .database-view-header {
     flex-shrink: 0;
@@ -1514,9 +1894,13 @@ body {
     border: none;
     border-radius: 5px;
     cursor: pointer;
+    transition: background 0.2s ease, transform 0.12s ease;
 }
 .back-to-chat-btn:hover {
     background: #1d4ed8;
+}
+.back-to-chat-btn:active {
+    transform: scale(0.98);
 }
 .admin-add-admin {
     flex-shrink: 0;
@@ -1629,9 +2013,13 @@ body {
     border-radius: 5px;
     cursor: pointer;
     font-size: 13px;
+    transition: background 0.2s ease, transform 0.1s ease;
 }
 .db-tab:hover {
     background: #d1d5db;
+}
+.db-tab:active {
+    transform: scale(0.98);
 }
 .db-tab.active {
     background: #2563eb;
@@ -1645,6 +2033,7 @@ body {
     border-radius: 8px;
     background: white;
     -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
 }
 .db-doc-link {
     color: #2563eb;
@@ -1711,3 +2100,274 @@ body {
     40% { transform: scale(1); opacity: 1; }
 }
 
+/* ---------- In-app toasts (replaces browser alert) ---------- */
+.toast-container {
+    position: fixed;
+    top: max(16px, env(safe-area-inset-top));
+    right: max(16px, env(safe-area-inset-right));
+    left: auto;
+    bottom: auto;
+    z-index: 10050;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    max-width: calc(100vw - 32px);
+    width: min(400px, 100%);
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 16px;
+    box-sizing: border-box;
+    border-radius: 12px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.9375rem;
+    line-height: 1.45;
+    box-shadow:
+        0 10px 40px rgba(15, 23, 42, 0.12),
+        0 0 0 1px rgba(15, 23, 42, 0.06);
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateX(12px);
+    transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.toast.toast--visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast.toast--out {
+    opacity: 0;
+    transform: translateX(8px);
+}
+
+.toast-icon {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toast-icon svg {
+    display: block;
+    width: 22px;
+    height: 22px;
+}
+
+.toast-message {
+    flex: 1;
+    min-width: 0;
+}
+
+.toast-dismiss {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    margin: -4px -6px -4px 0;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.toast-dismiss:hover {
+    background: rgba(15, 23, 42, 0.06);
+    color: #475569;
+}
+
+.toast--success {
+    border-left: 4px solid #10b981;
+}
+
+.toast--success .toast-icon {
+    color: #059669;
+}
+
+.toast--error {
+    border-left: 4px solid #ef4444;
+}
+
+.toast--error .toast-icon {
+    color: #dc2626;
+}
+
+.toast--warning {
+    border-left: 4px solid #f59e0b;
+}
+
+.toast--warning .toast-icon {
+    color: #d97706;
+}
+
+.toast--info {
+    border-left: 4px solid #3b82f6;
+}
+
+.toast--info .toast-icon {
+    color: #2563eb;
+}
+
+/* ---------- Custom confirm (replaces browser confirm) ---------- */
+.confirm-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10040;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    box-sizing: border-box;
+}
+
+.confirm-dialog.hidden {
+    display: none;
+}
+
+.confirm-dialog-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+}
+
+.confirm-dialog-box {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    padding: 24px;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.06);
+}
+
+.confirm-dialog-message {
+    margin: 0 0 20px;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    color: #334155;
+}
+
+.confirm-dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.confirm-dialog-btn {
+    padding: 10px 18px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.2s, border-color 0.2s, transform 0.12s;
+}
+
+.confirm-dialog-btn:active {
+    transform: scale(0.98);
+}
+
+.confirm-dialog-cancel {
+    background: #f1f5f9;
+    color: #475569;
+    border-color: #e2e8f0;
+}
+
+.confirm-dialog-cancel:hover {
+    background: #e2e8f0;
+}
+
+.confirm-dialog-btn--primary {
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+}
+
+.confirm-dialog-btn--primary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.confirm-dialog-btn--danger {
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.35);
+}
+
+.confirm-dialog-btn--danger:hover:not(:disabled) {
+    background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%);
+}
+
+@media (max-width: 480px) {
+    .toast-container {
+        left: max(16px, env(safe-area-inset-left));
+        right: max(16px, env(safe-area-inset-right));
+        width: auto;
+        align-items: stretch;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+    .chat-area,
+    .sidebar,
+    .doc-list,
+    .chat-docs-list,
+    .db-table-content {
+        scroll-behavior: auto;
+    }
+    .message-row {
+        animation: none;
+    }
+    #loginStep1,
+    #loginStep2 {
+        animation: none;
+    }
+    .database-view {
+        animation: none;
+    }
+    .popup {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+    .popup,
+    .popup .popup-box {
+        transition: none;
+    }
+    .profile-dropdown,
+    .chat-menu-dropdown {
+        transition: none;
+    }
+    .chat-docs-mobile-dropdown {
+        transition: none;
+    }
+    .toast {
+        transition: none;
+    }
+    .toast.toast--visible,
+    .toast.toast--out {
+        transform: none;
+    }
+    .confirm-dialog-backdrop {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}

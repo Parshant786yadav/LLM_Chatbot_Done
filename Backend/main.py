@@ -1230,9 +1230,22 @@ oauth.register(
     }
 )
 
+
+def _google_oauth_redirect_uri(request: Request) -> str:
+    """
+    Callback URL sent to Google must match an Authorized redirect URI exactly.
+    Set PUBLIC_BASE_URL=https://your.domain on Render so it matches your custom domain
+    (and matches Google Cloud Console) even if proxy headers differ.
+    """
+    base = (os.getenv("PUBLIC_BASE_URL") or os.getenv("OAUTH_PUBLIC_BASE_URL") or "").strip().rstrip("/")
+    if base:
+        return f"{base}/auth/google"
+    return str(request.url_for("auth_google"))
+
+
 @app.get("/login/google")
 async def login_google(request: Request):
-    redirect_uri = request.url_for("auth_google")
+    redirect_uri = _google_oauth_redirect_uri(request)
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 @app.get("/auth/google")
@@ -1243,8 +1256,8 @@ async def auth_google(request: Request):
     except OAuthError as e:
         # invalid_grant often means redirect_uri mismatch or expired code
         error_msg = urllib.parse.quote(
-            "Google sign-in failed. In Google Cloud Console, add this exact Redirect URI under your OAuth client: "
-            + str(request.base_url).rstrip("/") + "/auth/google"
+            "Google sign-in failed. In Google Cloud Console, add this exact Authorized redirect URI under your OAuth 2.0 Client: "
+            + _google_oauth_redirect_uri(request)
         )
         return RedirectResponse(frontend_url + "/?error=oauth&message=" + error_msg)
     user = token["userinfo"]
