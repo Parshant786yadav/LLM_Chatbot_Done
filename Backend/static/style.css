@@ -47,6 +47,10 @@ select,
 .layout {
     display: flex;
     height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    max-height: 100vh;
+    max-height: 100dvh;
 }
 
 .sidebar {
@@ -493,18 +497,77 @@ select,
 }
 
 @media (max-width: 768px) {
+    html {
+        height: 100%;
+        height: 100dvh;
+        height: -webkit-fill-available;
+    }
+
+    body {
+        margin: 0;
+        min-height: 100%;
+        min-height: 100dvh;
+        min-height: -webkit-fill-available;
+        overflow: hidden;
+        overscroll-behavior: none;
+    }
+
+    .layout {
+        height: 100vh;
+        height: 100dvh;
+        max-height: 100vh;
+        max-height: 100dvh;
+        min-height: 0;
+        overflow: hidden;
+    }
+
     .main {
         min-width: 0;
+        min-height: 0;
+        flex: 1;
         overflow-x: hidden;
+        overflow-y: hidden;
+        display: flex;
+        flex-direction: column;
     }
 
     #mainChatPanel {
         min-width: 0;
-        overflow-x: hidden;
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
     }
 
     .chat-container {
         min-width: 0;
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .chat-container-inner {
+        min-height: 0;
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .chat-container:not(.has-messages) .chat-area {
+        flex: 1 1 0;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .chat-container:not(.has-messages) .start-prompt {
+        margin: auto 0 6px 0 !important;
+        font-size: 0.875rem;
+        line-height: 1.35;
+        max-width: none;
+        padding: 0 4px;
     }
 
     .sidebar-overlay {
@@ -528,6 +591,11 @@ select,
         transform: translateX(-100%);
         transition: transform 0.25s ease;
         box-shadow: none;
+        padding-top: max(20px, env(safe-area-inset-top));
+        padding-bottom: max(20px, env(safe-area-inset-bottom));
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+        box-sizing: border-box;
     }
 
     .layout.sidebar-open .sidebar {
@@ -537,6 +605,28 @@ select,
 
     .sidebar-toggle {
         display: flex !important;
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
+        min-height: 48px;
+        margin: 0 6px 0 0;
+    }
+
+    .sidebar-toggle-icon {
+        width: 26px;
+        height: 22px;
+        gap: 6px;
+    }
+
+    .sidebar-toggle-line {
+        width: 24px;
+        height: 3px;
+        border-radius: 2px;
+    }
+
+    .sidebar-toggle-dot {
+        width: 9px;
+        height: 9px;
     }
 
     .sidebar-mobile-top {
@@ -572,31 +662,23 @@ select,
         opacity: 1;
     }
 
-    /* Mobile: chatbox always at bottom (same as after first message) */
+    /* Mobile: chatbox pinned in viewport; safe area for home indicator */
     .chat-container:not(.has-messages) .input-box {
         margin-top: 0 !important;
         margin-bottom: 0 !important;
         align-self: stretch !important;
         max-width: none !important;
-    }
-
-    .chat-container:not(.has-messages) .start-prompt {
-        margin-bottom: 8px;
+        flex-shrink: 0;
     }
 
     /* Mobile: chatbox responsive – no overflow, Send button always visible */
-    .chat-container-inner {
-        padding-left: 10px;
-        padding-right: 10px;
-        min-width: 0;
-    }
-
     .chat-container .input-box {
-        padding: 12px 10px;
+        padding: 12px 10px max(12px, env(safe-area-inset-bottom));
         gap: 8px;
         min-width: 0;
         width: 100%;
         box-sizing: border-box;
+        flex-shrink: 0;
     }
 
     .chat-container .input-box input {
@@ -611,11 +693,11 @@ select,
     }
 
     .chat-container.has-messages .input-box {
-        padding: 12px 10px;
+        padding: 12px 10px max(12px, env(safe-area-inset-bottom));
     }
 
     .chat-container .chat-header {
-        padding: 6px 8px 6px;
+        padding: max(6px, env(safe-area-inset-top)) 8px 6px;
         gap: 6px;
         min-width: 0;
         align-items: center;
@@ -628,7 +710,7 @@ select,
     }
 
     .chat-container .chat-header h3 {
-        font-size: 0.7rem;
+        font-size: 0.8125rem;
         font-weight: 600;
         min-width: 0;
         flex: 1;
@@ -875,6 +957,13 @@ select,
 .chat-container-inner {
     padding: 0;
     justify-content: flex-start;
+}
+
+@media (max-width: 768px) {
+    .chat-container-inner {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
 }
 
 /* Start branding hidden so start screen matches chat layout (header + empty area + input) */
@@ -2100,48 +2189,51 @@ select,
 .toast-container {
     position: fixed;
     top: max(16px, env(safe-area-inset-top));
-    right: max(16px, env(safe-area-inset-right));
-    left: auto;
+    left: 50%;
+    right: auto;
     bottom: auto;
+    transform: translateX(-50%);
     z-index: 10050;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: center;
     gap: 10px;
-    max-width: calc(100vw - 32px);
-    width: min(400px, 100%);
+    width: max-content;
+    max-width: min(200px, calc(100vw - 32px));
     pointer-events: none;
+    box-sizing: border-box;
 }
 
 .toast {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
+    gap: 10px;
     width: 100%;
-    padding: 14px 16px;
+    min-width: 0;
+    padding: 12px 12px;
     box-sizing: border-box;
     border-radius: 12px;
     background: #fff;
     color: #0f172a;
-    font-size: 0.9375rem;
-    line-height: 1.45;
+    font-size: 0.875rem;
+    line-height: 1.4;
     box-shadow:
         0 10px 40px rgba(15, 23, 42, 0.12),
         0 0 0 1px rgba(15, 23, 42, 0.06);
     pointer-events: auto;
     opacity: 0;
-    transform: translateX(12px);
+    transform: translateY(-10px);
     transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .toast.toast--visible {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
 }
 
 .toast.toast--out {
     opacity: 0;
-    transform: translateX(8px);
+    transform: translateY(-6px);
 }
 
 .toast-icon {
@@ -2163,6 +2255,8 @@ select,
 .toast-message {
     flex: 1;
     min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .toast-dismiss {
@@ -2216,6 +2310,35 @@ select,
 
 .toast--info .toast-icon {
     color: #2563eb;
+}
+
+.toast--loading {
+    border-left: 4px solid #3b82f6;
+}
+
+.toast--loading .toast-icon {
+    color: #2563eb;
+}
+
+.toast-icon--spinner {
+    margin-top: 0;
+}
+
+.toast-icon--spinner .toast-spinner {
+    display: block;
+    width: 20px;
+    height: 20px;
+    animation: toastSpinnerRotate 0.75s linear infinite;
+}
+
+.toast-icon--spinner .toast-spinner circle {
+    transform-origin: center;
+}
+
+@keyframes toastSpinnerRotate {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* ---------- Custom confirm (replaces browser confirm) ---------- */
@@ -2312,10 +2435,12 @@ select,
 
 @media (max-width: 480px) {
     .toast-container {
-        left: max(16px, env(safe-area-inset-left));
-        right: max(16px, env(safe-area-inset-right));
-        width: auto;
-        align-items: stretch;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        max-width: min(200px, calc(100vw - max(32px, env(safe-area-inset-left) + env(safe-area-inset-right))));
+        align-items: center;
+        width: max-content;
     }
 }
 
@@ -2361,6 +2486,9 @@ select,
     .toast.toast--visible,
     .toast.toast--out {
         transform: none;
+    }
+    .toast-icon--spinner .toast-spinner {
+        animation: none;
     }
     .confirm-dialog-backdrop {
         -webkit-backdrop-filter: none;

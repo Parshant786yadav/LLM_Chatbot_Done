@@ -60,16 +60,24 @@ var TOAST_ICONS = {
     info: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 16v-4M12 8h.01\" stroke-linecap=\"round\"/></svg>"
 };
 
-function toast(message, type) {
+var TOAST_SPINNER_SVG = "<svg class=\"toast-spinner\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9.5\" stroke=\"currentColor\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-dasharray=\"14 50\"/></svg>";
+
+function toast(message, type, opts) {
     type = type || "info";
+    opts = opts || {};
     var container = document.getElementById("toastContainer");
-    if (!container || message == null || message === "") return;
+    if (!container || message == null || message === "") return null;
     var el = document.createElement("div");
     el.className = "toast toast--" + type;
     el.setAttribute("role", "status");
     var iconEl = document.createElement("span");
-    iconEl.className = "toast-icon";
-    iconEl.innerHTML = TOAST_ICONS[type] || TOAST_ICONS.info;
+    if (type === "loading") {
+        iconEl.className = "toast-icon toast-icon--spinner";
+        iconEl.innerHTML = TOAST_SPINNER_SVG;
+    } else {
+        iconEl.className = "toast-icon";
+        iconEl.innerHTML = TOAST_ICONS[type] || TOAST_ICONS.info;
+    }
     var msgEl = document.createElement("span");
     msgEl.className = "toast-message";
     msgEl.textContent = String(message);
@@ -83,12 +91,25 @@ function toast(message, type) {
     el.appendChild(dismiss);
     container.appendChild(el);
     requestAnimationFrame(function () { el.classList.add("toast--visible"); });
-    var duration = type === "error" ? 6500 : 5000;
-    var timer = setTimeout(function () { removeToast(el); }, duration);
+    var duration;
+    if (opts.persistent) {
+        duration = null;
+    } else if (opts.duration != null) {
+        duration = opts.duration;
+    } else if (type === "loading") {
+        duration = null;
+    } else {
+        duration = type === "error" ? 6500 : 5000;
+    }
+    var timer = null;
+    if (duration != null && duration > 0) {
+        timer = setTimeout(function () { removeToast(el); }, duration);
+    }
     dismiss.onclick = function () {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         removeToast(el);
     };
+    return el;
 }
 
 function removeToast(el) {
@@ -397,7 +418,6 @@ async function doVerifyOtp() {
     
 }
 
-// Restore session from localStorage on page load
 // Restore session from localStorage on page load
 (function restoreSession() {
     function doRestore() {
@@ -1015,12 +1035,16 @@ async function uploadChatDoc() {
     formData.append("chat", currentChat);
     formData.append("mode", loginMode === "company" ? "company" : "personal");
 
+    var uploadNotice = null;
     try {
+        uploadNotice = toast("Uploading…", "loading", { persistent: true });
         const response = await fetch(API_BASE + "/upload", {
             method: "POST",
             body: formData
         });
         const data = await response.json();
+        if (uploadNotice) removeToast(uploadNotice);
+        uploadNotice = null;
         if (data.error) {
             toast(data.error, "error");
             return;
@@ -1031,6 +1055,7 @@ async function uploadChatDoc() {
         fileInput.value = "";
         if (data.message) toast(data.message, "success");
     } catch (err) {
+        if (uploadNotice) removeToast(uploadNotice);
         console.error("Chat document upload error:", err);
         toast("Upload failed. Is the backend running?", "error");
     }
@@ -1486,7 +1511,9 @@ async function uploadDocument() {
     formData.append("mode", loginMode === "company" ? "company" : "personal");
     // Global/company uploads: no chat. (Chat-specific docs use the Chat Documents panel in personal mode.)
 
+    var uploadNotice = null;
     try {
+        uploadNotice = toast("Uploading…", "loading", { persistent: true });
         const response = await fetch(API_BASE + "/upload", {
             method: "POST",
             body: formData
@@ -1501,6 +1528,9 @@ async function uploadDocument() {
         } catch (e) {
             console.error("Upload response parse error", e);
         }
+
+        if (uploadNotice) removeToast(uploadNotice);
+        uploadNotice = null;
 
         if (!response.ok) {
             toast(data.detail || data.error || "Upload failed.", "error");
@@ -1527,6 +1557,7 @@ async function uploadDocument() {
         }
         fileInput.value = "";
     } catch (error) {
+        if (uploadNotice) removeToast(uploadNotice);
         console.error("Upload error:", error);
         toast("Upload failed. Check the console and that the backend is running.", "error");
     }
