@@ -70,7 +70,8 @@ except ImportError:
     _IMAGE_OCR_AVAILABLE = False
     np = None
 
-load_dotenv()
+# Do not override real deployment env vars (e.g. Render) with a local .env file.
+load_dotenv(override=False)
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "document_storage")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -211,6 +212,11 @@ def home(request: Request):
 @app.on_event("startup")
 async def startup():
     _ensure_storage_bucket()
+    # Log effective Resend sender so Render logs confirm env (not sandbox) is loaded.
+    try:
+        print(f"[Resend] OTP from address at startup: {_resolve_resend_from()}", flush=True)
+    except Exception as e:
+        print(f"[Resend] Could not resolve sender at startup: {e}", flush=True)
     # Start background cache cleanup task
     asyncio.create_task(_cache_cleanup_task())
 
@@ -293,6 +299,36 @@ _otp_store: dict = {}
 OTP_EXPIRE_SECONDS = 600  # 10 minutes
 SECRET_TEST_OTP = "882644"  # Secret OTP for testing; accepts login without email OTP
 
+_RESEND_SANDBOX_FROM = "DocuMind <onboarding@resend.dev>"
+
+
+def _resolve_resend_from() -> str:
+    """
+    Build the Resend 'from' field. Resend only allows arbitrary recipients when
+    'from' uses a verified domain — not onboarding@resend.dev.
+
+    Prefer RESEND_FROM_ADDRESS=noreply@yourdomain.com (avoids angle-bracket issues
+    in hosting dashboards). Otherwise use RESEND_FROM_EMAIL or RESEND_FROM.
+    """
+    name = (os.getenv("RESEND_FROM_NAME") or "DocuMind").strip() or "DocuMind"
+    addr_only = (os.getenv("RESEND_FROM_ADDRESS") or "").strip()
+    if addr_only and "@" in addr_only:
+        return f"{name} <{addr_only}>"
+
+    raw = (os.getenv("RESEND_FROM_EMAIL") or os.getenv("RESEND_FROM") or "").strip()
+    if not raw:
+        return _RESEND_SANDBOX_FROM
+
+    raw = raw.replace("\u201c", '"').replace("\u201d", '"').replace("\u2018", "'").replace("\u2019", "'")
+    raw = raw.replace("\uff1c", "<").replace("\uff1e", ">")
+    raw = raw.strip()
+
+    # Bare email only (no display name)
+    if re.match(r"^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}$", raw):
+        return f"{name} <{raw}>"
+
+    return raw
+
 
 def _send_otp_email(to_email: str, otp: str) -> None:
     """Send OTP via Resend API (works on Render - no SMTP needed)."""
@@ -300,7 +336,13 @@ def _send_otp_email(to_email: str, otp: str) -> None:
     api_key = os.getenv("RESEND_API_KEY", "").strip()
     if not api_key:
         raise ValueError("RESEND_API_KEY must be set in environment")
-    from_email = os.getenv("RESEND_FROM_EMAIL", "DocuMind <onboarding@resend.dev>")
+    from_email = _resolve_resend_from()
+    if "onboarding@resend.dev" in from_email or "@resend.dev" in from_email:
+        print(
+            "[OTP] WARNING: Using Resend sandbox sender. Set RESEND_FROM_ADDRESS=noreply@yourdomain.com "
+            "or RESEND_FROM_EMAIL on a verified domain to mail arbitrary recipients.",
+            flush=True,
+        )
     print(f"[OTP] Sending from: {from_email}", flush=True)
     payload = _json.dumps({
         "from": from_email,
