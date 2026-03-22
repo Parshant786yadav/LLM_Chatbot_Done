@@ -1553,6 +1553,13 @@ select,
     color: #94a3b8;
 }
 
+.popup-google-btn,
+.profile-section .google-login-btn {
+    pointer-events: none;
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .popup-google-btn {
     display: flex;
     align-items: center;
