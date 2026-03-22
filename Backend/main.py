@@ -701,6 +701,67 @@ _ALLOWED_IMAGE = {
 }
 _ALLOWED_CONTENT_TYPES = _ALLOWED_PDF | _ALLOWED_IMAGE
 
+# If a PDF page has fewer characters than this from pypdf, render the page and run OCR (scanned / photo PDFs).
+_PDF_OCR_MIN_CHARS_PER_PAGE = int(os.getenv("PDF_OCR_MIN_CHARS_PER_PAGE", "42"))
+# Cap OCR passes per upload so huge scans do not time out (remaining pages keep vector text only).
+_PDF_OCR_MAX_PAGES = int(os.getenv("PDF_OCR_MAX_PAGES", "60"))
+
+
+def _ocr_pdf_page_fitz(pdf_bytes: bytes, page_index: int) -> str:
+    """Render one PDF page to a bitmap and OCR it (PyMuPDF + EasyOCR). Empty string if libraries missing or on error."""
+    doc = None
+    try:
+        import fitz  # PyMuPDF
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        if page_index < 0 or page_index >= len(doc):
+            return ""
+        page = doc[page_index]
+        mat = fitz.Matrix(2.0, 2.0)
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+        png_bytes = pix.tobytes("png")
+        return _extract_text_from_image(png_bytes, f"page_{page_index + 1}.png")
+    except Exception:
+        return ""
+    finally:
+        if doc is not None:
+            try:
+                doc.close()
+            except Exception:
+                pass
+
+
+def _ocr_placeholder(text: str) -> bool:
+    """True if OCR returned the fallback 'Image document: …' with almost no real text."""
+    t = (text or "").strip()
+    if not t.startswith("Image document:"):
+        return False
+    return len(t) < 80
+
+
+def _extract_text_from_pdf(content: bytes, filename: str) -> str:
+    """
+    Extract text from PDF: digital text via pypdf, plus OCR on pages with little/no text (scanned pages, photos).
+    """
+    reader = PdfReader(io.BytesIO(content))
+    pages = reader.pages
+    if not pages:
+        return ""
+
+    ocr_used = 0
+    parts: list[str] = []
+    for i, page in enumerate(pages):
+        vec = (page.extract_text() or "").strip()
+        if len(vec) < _PDF_OCR_MIN_CHARS_PER_PAGE and ocr_used < _PDF_OCR_MAX_PAGES:
+            ocr_used += 1
+            ocr = _ocr_pdf_page_fitz(content, i).strip()
+            if ocr and not _ocr_placeholder(ocr):
+                vec = (vec + "\n" + ocr).strip() if vec else ocr
+            elif not vec and ocr:
+                vec = ocr
+        parts.append(vec)
+
+    return "\n\n".join(p for p in parts if p)
+
 
 def _extract_text_from_image(content: bytes, filename: str) -> str:
     """Extract text from image using EasyOCR. Returns placeholder if OCR unavailable or fails."""
@@ -746,10 +807,13 @@ async def upload_document(
 
         content = await file.read()
         if content_type == "application/pdf":
-            reader = PdfReader(io.BytesIO(content))
-            full_text = "".join(p.extract_text() or "" for p in reader.pages)
+            full_text = await asyncio.to_thread(
+                _extract_text_from_pdf, content, file.filename or "document.pdf"
+            )
         else:
-            full_text = _extract_text_from_image(content, file.filename or "image")
+            full_text = await asyncio.to_thread(
+                _extract_text_from_image, content, file.filename or "image"
+            )
 
         is_company = (mode or "").strip().lower() == "company"
         if is_company and not _is_hr_email(email):
