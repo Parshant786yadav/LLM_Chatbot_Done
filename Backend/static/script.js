@@ -384,19 +384,23 @@ async function loadUserData(email) {
         }
 
         if (loginMode === "personal") {
-            // Load chat documents for each chat so count/list show after re-login
-            for (let i = 0; i < chats.length; i++) {
-                const chatName = chats[i];
-                try {
-                    const chatDocRes = await fetch(`${API_BASE}/documents/${email}/${encodeURIComponent(chatName)}`);
-                    const chatDocData = await chatDocRes.json();
-                    const chatDocList = chatDocData.documents || [];
-                    chatDocuments[chatName] = chatDocList.map(function (d) { return { id: d.id, name: d.name, file: null, has_preview: d.has_preview }; });
-                } catch (err) {
-                    console.error("Error loading docs for chat " + chatName, err);
-                    chatDocuments[chatName] = chatDocuments[chatName] || [];
-                }
-            }
+            const chatNames = chats.slice();
+            await Promise.all(
+                chatNames.map(function (chatName) {
+                    return fetch(`${API_BASE}/documents/${email}/${encodeURIComponent(chatName)}`)
+                        .then(function (r) { return r.json(); })
+                        .then(function (chatDocData) {
+                            const chatDocList = chatDocData.documents || [];
+                            chatDocuments[chatName] = chatDocList.map(function (d) {
+                                return { id: d.id, name: d.name, file: null, has_preview: d.has_preview };
+                            });
+                        })
+                        .catch(function (err) {
+                            console.error("Error loading docs for chat " + chatName, err);
+                            chatDocuments[chatName] = chatDocuments[chatName] || [];
+                        });
+                })
+            );
         }
 
     } catch (error) {
@@ -555,25 +559,32 @@ async function claimGuestChatIfAny(email) {
         var data = await res.json().catch(function () { return {}; });
         clearGuestSession();
         var newName = (data.name && data.name.trim()) ? data.name.trim() : guestChatId;
-        
-        // Set immediately before anything else renders
-        // currentChat = newName;
-        // try { localStorage.setItem("currentChat", newName); } catch(e) {}
-        // document.getElementById("chatTitle").innerText = newName;
-        // document.getElementById("chatArea").innerHTML = "";
-        
-        // await loadUserData(email);
-        // renderChats();
-        // await loadMessagesForCurrentChat();
+
         currentChat = newName;
         try { localStorage.setItem("currentChat", newName); } catch(e) {}
         document.getElementById("chatTitle").innerText = newName;
-        showChatAreaLoader();
-        showChatListLoader();
-
-        await loadUserData(email);
+        // Keep existing messages in the DOM — no reload (server already has them after claim).
+        var gi = chats.indexOf(guestChatId);
+        if (gi !== -1) chats[gi] = newName;
+        else if (chats.indexOf(newName) === -1) chats.unshift(newName);
         renderChats();
-        await loadMessagesForCurrentChat();
+
+        try {
+            var infoRes = await fetch(API_BASE + "/user-info?email=" + encodeURIComponent(email));
+            var info = await infoRes.json();
+            userUserId = info.user_id || null;
+            userIsAdmin = !!info.is_admin;
+            var dispEl = document.getElementById("profileUserId");
+            if (dispEl) dispEl.textContent = userUserId || "--";
+            var adminSec = document.getElementById("adminSection");
+            if (adminSec) adminSec.style.display = userIsAdmin ? "block" : "none";
+        } catch (e) {
+            console.error("Failed to load user info after claim", e);
+        }
+
+        loadUserData(email).catch(function (err) {
+            console.error("Error loading user data after guest claim", err);
+        });
         return true;
     } catch (e) {
         console.error("Claim guest chat error", e);

@@ -316,11 +316,16 @@ def _send_otp_email(to_email: str, otp: str) -> None:
             <p>DocuMind Team</p>
         </div>"""
     }).encode()
+    # Resend returns 403 error code 1010 if User-Agent is missing (common with urllib on some hosts).
     req = urllib.request.Request(
         "https://api.resend.com/emails",
         data=payload,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        method="POST"
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "DocuMind/1.0 (+https://resend.com/docs)",
+        },
+        method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
