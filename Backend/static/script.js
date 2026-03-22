@@ -276,7 +276,7 @@ function showPersonalLogin() {
     document.getElementById("loginStep2").style.display = "block";
     document.getElementById("loginStep2Title").textContent = "Personal sign in";
     var hint = document.getElementById("loginStep2Hint");
-    if (hint) hint.textContent = "We’ll email you a one-time code — no password to remember.";
+    if (hint) hint.textContent = "Didn’t get the OTP? Check spam";
     document.getElementById("loginEmailInput").placeholder = "you@example.com";
     document.getElementById("loginEmailInput").value = "";
     resetOtpStep();
