@@ -1223,6 +1223,20 @@ async function toggleCompanyShowCountToEmployees() {
     }
 }
 
+/* Move #chatDocs into the + dropdown on mobile so one anchored menu (avoids stray thin bar). */
+function layoutChatDocsPanelForViewport() {
+    var panel = document.getElementById("chatDocsPanel");
+    var ul = document.getElementById("chatDocs");
+    var dropdown = document.getElementById("chatDocsMobileDropdown");
+    var mobileWrap = document.getElementById("chatDocsMobileWrap");
+    if (!panel || !ul || !dropdown || !mobileWrap) return;
+    if (window.innerWidth <= 768) {
+        dropdown.appendChild(ul);
+    } else {
+        panel.insertBefore(ul, mobileWrap);
+    }
+}
+
 function triggerChatDocUploadFromMobile() {
     var input = document.getElementById("chatUpload");
     if (input) input.click();
@@ -1902,6 +1916,7 @@ function googleLogin() {
             if (mobileCount) mobileCount.textContent = n + " docs";
         }
         updateMessageInputPlaceholder();
+        layoutChatDocsPanelForViewport();
     }
     window.addEventListener("resize", updateChatDocsToggleText);
     if (document.readyState === "loading") {
