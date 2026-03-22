@@ -521,6 +521,47 @@ def _call_groq_with_system(
 CHAT_MODEL_PRIMARY = "llama-3.3-70b-versatile"
 CHAT_MODEL_FALLBACK = "llama-3.1-8b-instant"
 
+
+def _identity_reply(message: str) -> Optional[str]:
+    """Short answers for name / creator questions (before calling the LLM)."""
+    t = (message or "").strip().lower()
+    if not t:
+        return None
+    creator_phrases = (
+        "who made you",
+        "who made u",
+        "who created you",
+        "who created u",
+        "who built you",
+        "who developed you",
+        "who programmed you",
+        "who is your creator",
+        "your creator",
+        "who owns you",
+    )
+    name_phrases = (
+        "your name",
+        "what is your name",
+        "what's your name",
+        "whats your name",
+        "who are you",
+        "what should i call you",
+        "do you have a name",
+        "what are you called",
+    )
+    asks_creator = any(p in t for p in creator_phrases)
+    asks_name = any(p in t for p in name_phrases)
+    if asks_creator and asks_name:
+        return "I'm DocuMind, and Parshant created me."
+    if asks_creator:
+        return "Parshant"
+    if asks_name:
+        return "DocuMind"
+    if t in ("name?", "name", "who are you?", "what's ur name", "whats ur name"):
+        return "DocuMind"
+    return None
+
+
 def _chat_sync(req: ChatRequest):
     """Sync chat logic so we can run it in a thread and not block the event loop."""
     try:
@@ -550,6 +591,11 @@ def _chat_sync(req: ChatRequest):
             chat = db_ops.create_chat(user["id"], chat_name, user.get("display_id") or "")
 
         db_ops.add_message(chat["id"], "user", req.message, user.get("display_id"))
+
+        identity = _identity_reply(req.message)
+        if identity is not None:
+            db_ops.add_message(chat["id"], "model", identity, user.get("display_id"))
+            return {"reply": identity}
 
         history = db_ops.get_messages_for_chat(chat["id"])
         history_excluding_current = history[:-1] if len(history) > 1 else []
@@ -582,7 +628,9 @@ def _chat_sync(req: ChatRequest):
             context = "\n\n".join(top_chunks) if top_chunks else ""
 
         system_instruction = (
-            "You are a friendly, helpful AI assistant. Talk naturally like a human—warm, conversational, and engaging. "
+            "You are DocuMind, a friendly, helpful AI assistant. Talk naturally like a human—warm, conversational, and engaging. "
+            "If the user asks your name or what to call you, say your name is DocuMind. "
+            "If they ask who made you, who created you, or who built you, say Parshant. "
             "For greetings (e.g. hello, hi, how are you), small talk, or general questions, respond in a natural way. "
             "When the user has provided 'Relevant context from documents' below, use that context to answer questions about the documents when relevant; "
             "otherwise answer from your knowledge or chat normally. Never say you don't know for simple greetings or chitchat."

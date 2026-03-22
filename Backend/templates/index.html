@@ -107,6 +107,13 @@
                         <h4 class="chat-docs-panel-title">Chat Documents</h4>
                         <input type="file" id="chatUpload" accept=".pdf,application/pdf,image/*" onchange="uploadChatDoc()" class="chat-docs-upload">
                         <button type="button" class="documents-toggle chat-docs-toggle" id="chatDocsToggle" onclick="toggleChatDocsList()">Documents uploaded 0</button>
+                        <div class="chat-docs-mobile" id="chatDocsMobileWrap" aria-label="Chat documents">
+                            <button type="button" class="chat-docs-mobile-plus" id="chatDocsMobilePlus" onclick="toggleChatDocsUploadDropdown()" aria-expanded="false" aria-haspopup="true" title="Documents">+</button>
+                            <span class="chat-docs-mobile-count" id="chatDocsMobileCount">0 docs</span>
+                            <div class="chat-docs-mobile-dropdown" id="chatDocsMobileDropdown">
+                                <button type="button" class="chat-docs-mobile-upload-btn" id="chatDocsMobileUploadBtn" onclick="triggerChatDocUploadFromMobile()">Upload file</button>
+                            </div>
+                        </div>
                         <ul id="chatDocs" class="chat-docs-list doc-list doc-list-collapsed"></ul>
                     </div>
                 </div>
@@ -117,7 +124,7 @@
                 <div id="chatArea" class="chat-area"></div>
                 <p class="start-prompt" aria-hidden="true">Ask anything about your Documents</p>
                 <div class="input-box">
-                    <input id="messageInput" placeholder="Ask DocuMind ...">
+                    <input id="messageInput" placeholder="Ask DocuMind …" data-placeholder-desktop="Ask DocuMind …" data-placeholder-mobile="Ask a question…">
                     <button type="button" onclick="sendMessage()">Send</button>
                 </div>
                 <div class="start-spacer" aria-hidden="true"></div>

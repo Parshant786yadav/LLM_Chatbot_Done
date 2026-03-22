@@ -710,26 +710,25 @@ select,
     }
 
     .chat-container .chat-header h3 {
-        font-size: 0.8125rem;
+        font-size: 0.9375rem;
         font-weight: 600;
         min-width: 0;
-        flex: 1;
+        flex: 1 1 0;
         align-self: center;
         overflow: hidden;
         text-overflow: ellipsis;
-        white-space: normal;
-        word-break: break-word;
-        line-height: 1.2;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
-        -webkit-box-orient: vertical;
+        white-space: nowrap;
+        word-break: normal;
+        line-height: 1.25;
+        margin: 0;
     }
 
-    /* Chat Documents panel: small, right of DocuMind in same row */
+    /* Chat Documents: hide wide desktop controls; compact + menu (see .chat-docs-mobile) */
     .chat-docs-panel {
-        width: 65px;
-        min-width: 65px;
+        position: relative;
+        width: auto;
+        min-width: 0;
+        max-width: none;
         flex-shrink: 0;
         padding: 0;
         display: flex;
@@ -737,61 +736,47 @@ select,
         align-items: center;
     }
 
-    .chat-docs-panel-title {
-        display: block !important;
-        margin: 0 0 2px 0;
-        font-size: 8px;
-        font-weight: 600;
-        color: #334155;
-        line-height: 1.1;
+    .chat-docs-panel-title,
+    .chat-docs-upload,
+    .chat-docs-toggle {
+        display: none !important;
     }
 
-    .chat-docs-upload {
-        display: block !important;
-        width: 100%;
-        font-size: 8px;
-        margin-bottom: 2px;
-        padding: 3px 4px;
-        box-sizing: border-box;
-        border-radius: 2px;
-        border: 1px solid #e2e8f0;
-        min-height: 22px;
-    }
-
-    .chat-docs-panel .chat-docs-toggle {
-        display: block !important;
-        width: 100%;
-        font-size: 8px;
-        padding: 3px 4px;
-        text-align: center;
-        border-radius: 4px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        min-height: 22px;
-    }
-
-    .chat-docs-panel .chat-docs-list {
-        display: block;
-        max-height: 80px;
-        margin-top: 2px;
-        font-size: 8px;
-        border-radius: 4px;
+    .chat-docs-panel #chatDocs {
+        display: none;
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        left: auto;
+        width: min(260px, calc(100vw - 24px));
+        max-height: min(220px, 42vh);
+        margin: 0;
+        padding: 4px 0;
+        font-size: 12px;
+        border-radius: 10px;
         border: 1px solid #e2e8f0;
         background: #fff;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+        z-index: 55;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
-    .chat-docs-panel .chat-docs-list.doc-list-collapsed {
-        max-height: 0;
-        overflow: hidden;
-        margin: 0;
+    .chat-docs-panel:has(.chat-docs-mobile-dropdown.open) #chatDocs {
+        display: block !important;
+    }
+
+    .chat-docs-panel:has(.chat-docs-mobile-dropdown.open) #chatDocs.doc-list-collapsed {
+        max-height: min(220px, 42vh) !important;
+        overflow-y: auto !important;
+        margin-top: 0;
         padding: 0;
-        border: none;
+        border: 1px solid #e2e8f0;
     }
 
     .chat-docs-panel .chat-docs-list li {
-        padding: 4px 6px;
-        font-size: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
     }
 
     .chat-docs-mobile {
@@ -880,9 +865,11 @@ select,
     }
 }
 
-/* Desktop: hide mobile doc UI */
-.chat-docs-mobile {
-    display: none;
+/* Desktop only: hide compact + menu (mobile uses .chat-docs-mobile inside max-width:768) */
+@media (min-width: 769px) {
+    .chat-docs-mobile {
+        display: none !important;
+    }
 }
 
 /* Same full-width layout at start and after 1st message */

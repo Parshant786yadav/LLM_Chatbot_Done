@@ -1223,14 +1223,30 @@ async function toggleCompanyShowCountToEmployees() {
     }
 }
 
+function triggerChatDocUploadFromMobile() {
+    var input = document.getElementById("chatUpload");
+    if (input) input.click();
+    closeChatDocsUploadDropdown();
+}
+
 function toggleChatDocsUploadDropdown() {
     var dropdown = document.getElementById("chatDocsMobileDropdown");
     var plus = document.getElementById("chatDocsMobilePlus");
     if (!dropdown || !plus) return;
     var isOpen = dropdown.classList.toggle("open");
     plus.setAttribute("aria-expanded", isOpen);
+    var list = document.getElementById("chatDocs");
+    if (list && window.innerWidth <= 768) {
+        if (isOpen) {
+            list.classList.remove("doc-list-collapsed");
+        } else {
+            list.classList.add("doc-list-collapsed");
+        }
+    }
     if (isOpen) {
-        document.addEventListener("click", closeChatDocsUploadDropdownOnClickOutside);
+        setTimeout(function () {
+            document.addEventListener("click", closeChatDocsUploadDropdownOnClickOutside);
+        }, 0);
     } else {
         document.removeEventListener("click", closeChatDocsUploadDropdownOnClickOutside);
     }
@@ -1241,6 +1257,10 @@ function closeChatDocsUploadDropdown() {
     var plus = document.getElementById("chatDocsMobilePlus");
     if (dropdown) dropdown.classList.remove("open");
     if (plus) plus.setAttribute("aria-expanded", "false");
+    var list = document.getElementById("chatDocs");
+    if (list && window.innerWidth <= 768) {
+        list.classList.add("doc-list-collapsed");
+    }
     document.removeEventListener("click", closeChatDocsUploadDropdownOnClickOutside);
 }
 
@@ -1290,6 +1310,10 @@ function renderChatDocs() {
         li.appendChild(removeBtn);
         list.appendChild(li);
     });
+    var dd = document.getElementById("chatDocsMobileDropdown");
+    if (window.innerWidth <= 768 && dd && dd.classList.contains("open")) {
+        list.classList.remove("doc-list-collapsed");
+    }
 }
 
 async function removeChatDoc(docId) {
@@ -1853,8 +1877,17 @@ function googleLogin() {
     }
 })();
 
-/* Update Chat Documents toggle text and mobile count on resize */
+/* Update Chat Documents toggle text, mobile count, and input placeholder on resize */
 (function setupChatDocsToggleResize() {
+    function updateMessageInputPlaceholder() {
+        var input = document.getElementById("messageInput");
+        if (!input) return;
+        var mobile = input.getAttribute("data-placeholder-mobile");
+        var desktop = input.getAttribute("data-placeholder-desktop");
+        if (mobile && desktop) {
+            input.placeholder = window.innerWidth <= 768 ? mobile : desktop;
+        }
+    }
     function updateChatDocsToggleText() {
         var toggleBtn = document.getElementById("chatDocsToggle");
         var mobileCount = document.getElementById("chatDocsMobileCount");
@@ -1868,6 +1901,7 @@ function googleLogin() {
             toggleBtn.textContent = (window.innerWidth <= 768) ? (n + " docs") : ("Documents uploaded " + n);
             if (mobileCount) mobileCount.textContent = n + " docs";
         }
+        updateMessageInputPlaceholder();
     }
     window.addEventListener("resize", updateChatDocsToggleText);
     if (document.readyState === "loading") {
