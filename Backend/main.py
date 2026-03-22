@@ -326,7 +326,9 @@ def _send_otp_email(to_email: str, otp: str) -> None:
         with urllib.request.urlopen(req, timeout=10) as resp:
             resp.read()
     except urllib.error.HTTPError as e:
-        raise ValueError(f"Resend API error: {e.read().decode()}")
+        body = e.read().decode()
+        print(f"[OTP] Resend error {e.code}: {body}", flush=True)
+        raise ValueError(f"Resend API error: {body}")
 
 
 def _otp_cleanup_expired():
