@@ -763,8 +763,42 @@ def _extract_text_from_pdf(content: bytes, filename: str) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
+import base64
+
 def _extract_text_from_image(content: bytes, filename: str) -> str:
-    """Extract text from image using EasyOCR. Returns placeholder if OCR unavailable or fails."""
+    """Extract text from image. Uses Groq Vision for fast/accurate extraction, with EasyOCR fallback."""
+    # Try Groq Vision first if available
+    if client:
+        try:
+            # Reformat content type (e.g. from filename extension or default to jpeg)
+            ext = (os.path.splitext(filename)[1] or ".jpg").lower().replace(".", "")
+            if ext == "jpg":
+                ext = "jpeg"
+            b64_img = base64.b64encode(content).decode("utf-8")
+            
+            response = client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Extract all the text from this image accurately. Return only the extracted text, no explanations, no markdown formatting. If there is no text, return empty."},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/{ext};base64,{b64_img}"},
+                            },
+                        ],
+                    }
+                ],
+                model="llama-3.2-11b-vision-preview",
+            )
+            extracted_text = (response.choices[0].message.content or "").strip()
+            if extracted_text and len(extracted_text) > 5:
+                # Successfully extracted text using vision model
+                return extracted_text
+        except Exception as e:
+            print(f"[OCR] Groq Vision failed: {e}", flush=True)
+
+    # Fallback to EasyOCR if Groq Vision fails or isn't available
     if not _IMAGE_OCR_AVAILABLE or np is None:
         return f"Image document: {filename}"
     try:
@@ -777,7 +811,8 @@ def _extract_text_from_image(content: bytes, filename: str) -> str:
         result = reader.readtext(arr)
         text = " ".join([item[1] for item in result if len(item) > 1]).strip()
         return text or f"Image document: {filename}"
-    except Exception:
+    except Exception as e:
+        print(f"[OCR] EasyOCR fallback failed: {e}", flush=True)
         return f"Image document: {filename}"
 
 
