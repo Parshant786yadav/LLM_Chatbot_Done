@@ -206,7 +206,7 @@ templates = Jinja2Templates(directory=_TEMPLATES_DIR)
 def home(request: Request):
     if request.method == "HEAD":
         return Response(status_code=200)
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="index.html")
 
 
 @app.on_event("startup")
