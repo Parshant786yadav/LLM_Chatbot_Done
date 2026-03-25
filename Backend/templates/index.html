@@ -67,7 +67,7 @@
             <div class="section documents-block">
                 <h4 id="documentSectionTitle">Global Documents</h4>
                 <div id="documentUploadWrap">
-                    <input type="file" id="globalUpload" accept=".pdf,application/pdf,image/*" onchange="uploadDocument()">
+                    <input type="file" id="globalUpload" accept=".pdf,application/pdf" onchange="uploadDocument()">
                 </div>
                 <div id="globalDocsBlock">
                     <button type="button" class="documents-toggle" id="globalDocsToggle" onclick="toggleGlobalDocsList()">Documents uploaded 0</button>
@@ -105,7 +105,7 @@
                     <h3 id="chatTitle">DocuMind</h3>
                     <div id="chatDocsPanel" class="chat-docs-panel">
                         <h4 class="chat-docs-panel-title">Chat Documents</h4>
-                        <input type="file" id="chatUpload" accept=".pdf,application/pdf,image/*" onchange="uploadChatDoc()" class="chat-docs-upload">
+                        <input type="file" id="chatUpload" accept=".pdf,application/pdf" onchange="uploadChatDoc()" class="chat-docs-upload">
                         <button type="button" class="documents-toggle chat-docs-toggle" id="chatDocsToggle" onclick="toggleChatDocsList()">Documents uploaded 0</button>
                         <ul id="chatDocs" class="chat-docs-list doc-list doc-list-collapsed"></ul>
                         <div class="chat-docs-mobile" id="chatDocsMobileWrap" aria-label="Chat documents">

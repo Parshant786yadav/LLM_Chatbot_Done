@@ -53,22 +53,10 @@ _easyocr_reader = None
 
 def _get_easyocr_reader():
     """Lazy-load EasyOCR reader once (loads model on first image upload)."""
-    global _easyocr_reader
-    if _easyocr_reader is None:
-        try:
-            import easyocr
-            _easyocr_reader = easyocr.Reader(["en"], gpu=False)
-        except Exception:
-            _easyocr_reader = False
-    return _easyocr_reader if _easyocr_reader else None
+    return None
 
-try:
-    from PIL import Image
-    import numpy as np
-    _IMAGE_OCR_AVAILABLE = True
-except ImportError:
-    _IMAGE_OCR_AVAILABLE = False
-    np = None
+_IMAGE_OCR_AVAILABLE = False
+np = None
 
 # Do not override real deployment env vars (e.g. Render) with a local .env file.
 load_dotenv(override=False)
@@ -695,10 +683,7 @@ def _sanitize_filename(name: str) -> str:
 
 # PDF and image types for upload
 _ALLOWED_PDF = {"application/pdf"}
-_ALLOWED_IMAGE = {
-    "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
-    "image/bmp", "image/tiff", "image/x-tiff", "image/pjpeg",
-}
+_ALLOWED_IMAGE = set() # Image upload disabled to save memory
 _ALLOWED_CONTENT_TYPES = _ALLOWED_PDF | _ALLOWED_IMAGE
 
 # If a PDF page has fewer characters than this from pypdf, render the page and run OCR (scanned / photo PDFs).
@@ -709,25 +694,7 @@ _PDF_OCR_MAX_PAGES = int(os.getenv("PDF_OCR_MAX_PAGES", "60"))
 
 def _ocr_pdf_page_fitz(pdf_bytes: bytes, page_index: int) -> str:
     """Render one PDF page to a bitmap and OCR it (PyMuPDF + EasyOCR). Empty string if libraries missing or on error."""
-    doc = None
-    try:
-        import fitz  # PyMuPDF
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        if page_index < 0 or page_index >= len(doc):
-            return ""
-        page = doc[page_index]
-        mat = fitz.Matrix(2.0, 2.0)
-        pix = page.get_pixmap(matrix=mat, alpha=False)
-        png_bytes = pix.tobytes("png")
-        return _extract_text_from_image(png_bytes, f"page_{page_index + 1}.png")
-    except Exception:
-        return ""
-    finally:
-        if doc is not None:
-            try:
-                doc.close()
-            except Exception:
-                pass
+    return ""
 
 
 def _ocr_placeholder(text: str) -> bool:
@@ -766,54 +733,8 @@ def _extract_text_from_pdf(content: bytes, filename: str) -> str:
 import base64
 
 def _extract_text_from_image(content: bytes, filename: str) -> str:
-    """Extract text from image. Uses Groq Vision for fast/accurate extraction, with EasyOCR fallback."""
-    # Try Groq Vision first if available
-    if client:
-        try:
-            # Reformat content type (e.g. from filename extension or default to jpeg)
-            ext = (os.path.splitext(filename)[1] or ".jpg").lower().replace(".", "")
-            if ext == "jpg":
-                ext = "jpeg"
-            b64_img = base64.b64encode(content).decode("utf-8")
-            
-            response = client.chat.completions.create(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": "Extract all the text from this image accurately. Return only the extracted text, no explanations, no markdown formatting. If there is no text, return empty."},
-                            {
-                                "type": "image_url",
-                                "image_url": {"url": f"data:image/{ext};base64,{b64_img}"},
-                            },
-                        ],
-                    }
-                ],
-                model="llama-3.2-11b-vision-preview",
-            )
-            extracted_text = (response.choices[0].message.content or "").strip()
-            if extracted_text and len(extracted_text) > 5:
-                # Successfully extracted text using vision model
-                return extracted_text
-        except Exception as e:
-            print(f"[OCR] Groq Vision failed: {e}", flush=True)
-
-    # Fallback to EasyOCR if Groq Vision fails or isn't available
-    if not _IMAGE_OCR_AVAILABLE or np is None:
-        return f"Image document: {filename}"
-    try:
-        reader = _get_easyocr_reader()
-        if reader is None:
-            return f"Image document: {filename}"
-        img = Image.open(io.BytesIO(content))
-        img = img.convert("RGB")
-        arr = np.array(img)
-        result = reader.readtext(arr)
-        text = " ".join([item[1] for item in result if len(item) > 1]).strip()
-        return text or f"Image document: {filename}"
-    except Exception as e:
-        print(f"[OCR] EasyOCR fallback failed: {e}", flush=True)
-        return f"Image document: {filename}"
+    """Extract text from image. Disabled to save memory."""
+    return f"Image document: {filename}"
 
 
 def _media_type_for_path(file_path: str) -> str:
@@ -838,7 +759,7 @@ async def upload_document(
     try:
         content_type = (file.content_type or "").strip().lower()
         if content_type not in _ALLOWED_CONTENT_TYPES:
-            return {"error": "Only PDF and images (e.g. JPG, PNG, GIF, WebP) are supported"}
+            return {"error": "Only PDF files are supported"}
 
         content = await file.read()
         if content_type == "application/pdf":
@@ -846,9 +767,7 @@ async def upload_document(
                 _extract_text_from_pdf, content, file.filename or "document.pdf"
             )
         else:
-            full_text = await asyncio.to_thread(
-                _extract_text_from_image, content, file.filename or "image"
-            )
+            return {"error": "Photo/Image text extraction disabled."}
 
         is_company = (mode or "").strip().lower() == "company"
         if is_company and not _is_hr_email(email):
