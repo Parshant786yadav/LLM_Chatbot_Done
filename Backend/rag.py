@@ -15,7 +15,7 @@ import numpy as np
 # ---------------------------------------------------------------------------
 HF_API_TOKEN = os.getenv("HF_API_TOKEN", "")          # optional but recommended
 HF_MODEL = "sentence-transformers/all-MiniLM-L6-v2"    # 384-dim, fast, free
-HF_API_URL = f"https://router.huggingface.co/hf-inference/pipeline/feature-extraction/{HF_MODEL}"
+HF_API_URL = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL}"
 EMBEDDING_DIM = 384   # must match model above
 
 
