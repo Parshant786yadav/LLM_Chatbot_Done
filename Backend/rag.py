@@ -22,7 +22,7 @@ EMBEDDING_DIM = 384   # must match model above
 # ---------------------------------------------------------------------------
 # Text splitting
 # ---------------------------------------------------------------------------
-def split_text(text: str, chunk_size: int = 400) -> list[str]:
+def split_text(text: str, chunk_size: int = 150) -> list[str]:
     words = text.split()
     return [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
 
@@ -53,6 +53,9 @@ def _hf_embed(texts: list[str]) -> list[list[float]] | None:
         req = urllib.request.Request(HF_API_URL, data=payload, headers=headers, method="POST")
         with urllib.request.urlopen(req, timeout=30) as resp:
             result = json.loads(resp.read().decode())
+        if isinstance(result, dict) and "error" in result:
+            print(f"[RAG] HF API returned dict error: {result['error']}", flush=True)
+            return None
         # result is either [[float, ...], ...] or [[[float,...]], ...]
         # Flatten one extra nesting level if present (pipeline/feature-extraction wraps each token)
         embeddings = []
@@ -64,7 +67,14 @@ def _hf_embed(texts: list[str]) -> list[list[float]] | None:
             else:
                 embeddings.append(item)
         return embeddings
-    except Exception:
+    except Exception as e:
+        err_msg = ""
+        if hasattr(e, "read"):
+            try:
+                err_msg = e.read().decode()
+            except:
+                pass
+        print(f"[RAG] HF API Error: {e} | {err_msg}", flush=True)
         return None
 
 
@@ -85,8 +95,8 @@ def create_embeddings_batch(texts: list[str]) -> list[list[float]]:
         return []
     # HF free tier has a limit; batch in chunks of 32
     all_embeddings: list[list[float]] = []
-    for i in range(0, len(texts), 32):
-        batch = texts[i:i + 32]
+    for i in range(0, len(texts), 16):
+        batch = texts[i:i + 16]
         result = _hf_embed(batch)
         if result and len(result) == len(batch):
             all_embeddings.extend(result)
