@@ -8,12 +8,12 @@ python-dotenv>=1.0.0
 supabase>=2.0.0
 pypdf>=3.0.0
 # sentence-transformers>=2.2.0
-# numpy>=1.24.0 (removed to save memory)
+numpy>=1.24.0
 # Pillow>=10.0.0 (removed)
 # OCR for images and scanned PDF pages (pulls torch ~2GB; omit only if you use image uploads without text)
-# easyocr>=1.7.0 (removed)
+# easyocr>=1.7.0 (removed to save memory)
 # Render PDF pages to bitmaps for OCR when a page has little/no extractable text
-# pymupdf>=1.23.0 (removed)
+pymupdf>=1.23.0
 jinja2
 python-multipart
 
