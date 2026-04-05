@@ -2,8 +2,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import os
+import secrets
+import bcrypt
 import io
 import re
 import time
@@ -282,6 +284,28 @@ class VerifyOtpRequest(BaseModel):
     mode: Optional[str] = "personal"  # "personal" or "company"
 
 
+class CreateUserApiKeyRequest(BaseModel):
+    email: str
+    scope: str  # "chat" | "global"
+    chat_name: Optional[str] = None  # required when scope == "chat"
+    label: Optional[str] = None
+
+
+class RevokeUserApiKeyRequest(BaseModel):
+    email: str
+    key_id: int
+
+
+class ExternalChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ExternalChatRequest(BaseModel):
+    message: str
+    history: Optional[List[ExternalChatMessage]] = None
+
+
 # In-memory OTP store: { email_lower: { "otp": "123456", "expires_at": unix_ts } }
 _otp_store: dict = {}
 OTP_EXPIRE_SECONDS = 600  # 10 minutes
@@ -550,6 +574,161 @@ def _identity_reply(message: str) -> Optional[str]:
     return None
 
 
+_API_KEY_PATTERN = re.compile(r"^dm_([a-f0-9]{16})_([a-f0-9]{32})$", re.IGNORECASE)
+
+
+def _generate_user_api_key_tuple() -> tuple[str, str, str]:
+    """Returns (lookup_id, plaintext_full_key, bcrypt_hash_utf8)."""
+    lookup_id = secrets.token_hex(8)
+    secret = secrets.token_hex(16)
+    full_key = f"dm_{lookup_id}_{secret}"
+    h = bcrypt.hashpw(full_key.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    return lookup_id, full_key, h
+
+
+def _parse_bearer_api_key(authorization: Optional[str]) -> Optional[str]:
+    if not authorization or not isinstance(authorization, str):
+        return None
+    s = authorization.strip()
+    if s.lower().startswith("bearer "):
+        return s[7:].strip() or None
+    return s or None
+
+
+def _resolve_user_api_key_row(raw_key: str) -> Optional[dict]:
+    m = _API_KEY_PATTERN.match((raw_key or "").strip())
+    if not m:
+        return None
+    lookup_id = m.group(1).lower()
+    secret_hex = m.group(2).lower()
+    full_key = f"dm_{lookup_id}_{secret_hex}"
+    row = db_ops.get_user_api_key_by_lookup_id(lookup_id)
+    if not row:
+        return None
+    try:
+        ok = bcrypt.checkpw(full_key.encode("utf-8"), (row.get("key_hash") or "").encode("utf-8"))
+    except Exception:
+        return None
+    if not ok:
+        return None
+    return row
+
+
+def _user_allowed_api_keys(user: dict) -> bool:
+    """API keys are for personal workspaces only (not company mode)."""
+    if not user:
+        return False
+    if (user.get("user_type") or "").strip().lower() == "company":
+        return False
+    if user.get("company_id") is not None:
+        return False
+    return True
+
+
+def _normalize_api_history(history: Optional[List[ExternalChatMessage]]) -> list[dict]:
+    out: list[dict] = []
+    if not history:
+        return out
+    for m in history[:120]:
+        role = (m.role or "").strip().lower()
+        content = (m.content or "").strip()
+        if not content or len(content) > 32000:
+            continue
+        if role == "model":
+            role = "assistant"
+        if role not in ("user", "assistant"):
+            continue
+        out.append({"role": role, "content": content})
+    return out[-(_MAX_CHAT_HISTORY_TURNS * 2) :]
+
+
+def _rag_user_contents_for_query(
+    history_messages: list[dict],
+    current_message: str,
+    full_history_user_contents: Optional[list] = None,
+) -> list[str]:
+    """User message strings for embedding query (last 10), including current message."""
+    if full_history_user_contents is not None:
+        parts = [str(p) for p in full_history_user_contents if p is not None and str(p).strip()]
+        if not parts and (current_message or "").strip():
+            parts = [(current_message or "").strip()]
+        return parts[-10:] if parts else []
+    users = [m.get("content") for m in history_messages if m.get("role") == "user" and m.get("content")]
+    msg = (current_message or "").strip()
+    if msg and (not users or users[-1] != msg):
+        users = users + [msg]
+    return users[-10:] if users else ([msg] if msg else [])
+
+
+def _docmind_reply_from_rag(
+    chunks: list,
+    message: str,
+    history_messages: list[dict],
+    rag_user_contents: list[str],
+) -> dict:
+    """Build RAG context from chunks and return {\"reply\": str}. Uses global Groq client."""
+    if not client:
+        return {"reply": "GROQ_API_KEY not found in .env"}
+
+    rag_query_parts = rag_user_contents[-10:] if rag_user_contents else [(message or "").strip()]
+    rag_query = " ".join(str(p) for p in rag_query_parts if p).strip() or (message or "").strip()
+
+    context = ""
+    if chunks:
+        query_embedding = create_embedding(rag_query)
+        scored_chunks = []
+        for ch in chunks:
+            emb = ch.get("embedding")
+            if not emb:
+                continue
+            chunk_embedding = json.loads(emb) if isinstance(emb, str) else emb
+            score = cosine_similarity(query_embedding, chunk_embedding)
+            scored_chunks.append((score, ch.get("content") or ""))
+        scored_chunks.sort(key=lambda x: x[0], reverse=True)
+        print(f"[CHAT] Total chunks: {len(chunks)}, Top scores: {[round(s,3) for s,_ in scored_chunks[:5]]}", flush=True)
+        top_chunks = [c[1] for c in scored_chunks[:5] if c[0] > 0.05]
+        print(f"[CHAT] Context chunks used: {len(top_chunks)}", flush=True)
+        context = "\n\n".join(top_chunks) if top_chunks else ""
+
+    system_instruction = (
+        "You are DocuMind, a friendly, helpful AI assistant. Talk naturally like a human—warm, conversational, and engaging. "
+        "If the user asks your name or what to call you, say your name is DocuMind. "
+        "If they ask who made you, who created you, or who built you, say Parshant. "
+        "For greetings (e.g. hello, hi, how are you), small talk, or general questions, respond in a natural way. "
+        "When the user has provided 'Relevant context from documents' below, use that context to answer questions about the documents when relevant; "
+        "otherwise answer from your knowledge or chat normally. Never say you don't know for simple greetings or chitchat."
+    )
+    final_prompt = (
+        f"""Relevant context from the user's uploaded documents:
+
+{context}
+
+---
+
+User: {message}"""
+        if context.strip()
+        else message
+    )
+
+    reply = None
+    last_error = None
+    for model in (CHAT_MODEL_PRIMARY, CHAT_MODEL_FALLBACK):
+        try:
+            reply = _call_groq_with_system(client, model, system_instruction, history_messages, final_prompt)
+            break
+        except Exception as e:
+            last_error = e
+            if _is_quota_error(e):
+                continue
+            raise
+
+    if reply is None and last_error and _is_quota_error(last_error):
+        return {"reply": "Rate limit reached. Please try again in a few minutes or check https://console.groq.com/docs/rate-limits"}
+    if reply is None:
+        raise last_error or RuntimeError("No reply from model")
+    return {"reply": reply}
+
+
 def _chat_sync(req: ChatRequest):
     """Sync chat logic so we can run it in a thread and not block the event loop."""
     try:
@@ -596,60 +775,10 @@ def _chat_sync(req: ChatRequest):
         else:
             chunks = db_ops.get_document_chunks_personal(user["id"], chat["id"])
 
-        context = ""
-        if chunks:
-            rag_query_parts = history_user_contents[-10:] if history_user_contents else [req.message]
-            rag_query = " ".join(rag_query_parts).strip() or req.message
-            query_embedding = create_embedding(rag_query)
-            scored_chunks = []
-            for ch in chunks:
-                emb = ch.get("embedding")
-                if not emb:
-                    continue
-                chunk_embedding = json.loads(emb) if isinstance(emb, str) else emb
-                score = cosine_similarity(query_embedding, chunk_embedding)
-                scored_chunks.append((score, ch.get("content") or ""))
-            scored_chunks.sort(key=lambda x: x[0], reverse=True)
-            print(f"[CHAT] Total chunks: {len(chunks)}, Top scores: {[round(s,3) for s,_ in scored_chunks[:5]]}", flush=True)
-            top_chunks = [c[1] for c in scored_chunks[:5] if c[0] > 0.05]
-            print(f"[CHAT] Context chunks used: {len(top_chunks)}", flush=True)
-            context = "\n\n".join(top_chunks) if top_chunks else ""
-
-        system_instruction = (
-            "You are DocuMind, a friendly, helpful AI assistant. Talk naturally like a human—warm, conversational, and engaging. "
-            "If the user asks your name or what to call you, say your name is DocuMind. "
-            "If they ask who made you, who created you, or who built you, say Parshant. "
-            "For greetings (e.g. hello, hi, how are you), small talk, or general questions, respond in a natural way. "
-            "When the user has provided 'Relevant context from documents' below, use that context to answer questions about the documents when relevant; "
-            "otherwise answer from your knowledge or chat normally. Never say you don't know for simple greetings or chitchat."
-        )
-        final_prompt = f"""Relevant context from the user's uploaded documents:
-
-{context}
-
----
-
-User: {req.message}""" if context.strip() else req.message
-
-        reply = None
-        last_error = None
-        for model in (CHAT_MODEL_PRIMARY, CHAT_MODEL_FALLBACK):
-            try:
-                reply = _call_groq_with_system(client, model, system_instruction, history_messages, final_prompt)
-                break
-            except Exception as e:
-                last_error = e
-                if _is_quota_error(e):
-                    continue
-                raise
-
-        if reply is None and last_error and _is_quota_error(last_error):
-            return {"reply": "Rate limit reached. Please try again in a few minutes or check https://console.groq.com/docs/rate-limits"}
-        if reply is None:
-            raise last_error or RuntimeError("No reply from model")
-
-        db_ops.add_message(chat["id"], "model", reply, user.get("display_id"))
-        return {"reply": reply}
+        rag_users = _rag_user_contents_for_query(history_messages, req.message, history_user_contents)
+        result = _docmind_reply_from_rag(chunks, req.message, history_messages, rag_users)
+        db_ops.add_message(chat["id"], "model", result["reply"], user.get("display_id"))
+        return {"reply": result["reply"]}
 
     except Exception as e:
         if _is_quota_error(e):
@@ -675,6 +804,159 @@ async def chat(req: ChatRequest):
             await _message_cache.invalidate(user["id"], chat["id"])
     
     return await asyncio.to_thread(_chat_sync, req)
+
+
+class UnauthorizedApiKeyError(Exception):
+    """Invalid or revoked API key (used by /api/v1/chat)."""
+
+
+def _external_api_chat_sync(raw_key: str, body: ExternalChatRequest) -> dict:
+    row = _resolve_user_api_key_row(raw_key)
+    if not row:
+        raise UnauthorizedApiKeyError()
+
+    user = db_ops.get_user_by_id(int(row["user_id"]))
+    if not user or not _user_allowed_api_keys(user):
+        raise UnauthorizedApiKeyError()
+
+    scope = (row.get("scope") or "").strip().lower()
+    if scope == "chat":
+        cid = row.get("chat_id")
+        if cid is None:
+            raise UnauthorizedApiKeyError()
+        chat = db_ops.get_chat_by_id(int(cid))
+        if not chat or int(chat["user_id"]) != int(user["id"]):
+            raise UnauthorizedApiKeyError()
+        chunks = db_ops.get_document_chunks_chat_scoped(int(user["id"]), int(cid))
+    elif scope == "global":
+        chunks = db_ops.get_document_chunks_global_scoped(int(user["id"]))
+    else:
+        raise UnauthorizedApiKeyError()
+
+    msg = (body.message or "").strip()
+    if not msg:
+        return {"reply": "message is required", "error": "bad_request"}
+    if len(msg) > 32000:
+        return {"reply": "message too long", "error": "bad_request"}
+
+    history_messages = _normalize_api_history(body.history)
+    identity = _identity_reply(msg)
+    if identity is not None:
+        return {"reply": identity}
+
+    rag_users = _rag_user_contents_for_query(history_messages, msg, None)
+    result = _docmind_reply_from_rag(chunks, msg, history_messages, rag_users)
+    return {"reply": result["reply"]}
+
+
+@app.post("/api-keys/create")
+def create_user_api_key(body: CreateUserApiKeyRequest):
+    email = (body.email or "").strip().lower()
+    user = db_ops.get_user_by_email(email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not _user_allowed_api_keys(user):
+        raise HTTPException(status_code=403, detail="API keys are only available for personal accounts.")
+    scope = (body.scope or "").strip().lower()
+    if scope not in ("chat", "global"):
+        raise HTTPException(status_code=400, detail="scope must be 'chat' or 'global'")
+
+    chat_id: Optional[int] = None
+    if scope == "chat":
+        cname = (body.chat_name or "").strip()
+        if not cname:
+            raise HTTPException(status_code=400, detail="chat_name is required for chat-scoped keys")
+        chat = db_ops.get_chat_by_user_and_name(user["id"], cname)
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
+        chat_id = int(chat["id"])
+
+    label = (body.label or "").strip() or None
+    try:
+        lookup_id, full_key, key_hash = _generate_user_api_key_tuple()
+        ins = db_ops.insert_user_api_key(int(user["id"]), scope, chat_id, lookup_id, key_hash, label)
+    except Exception as e:
+        err_str = str(e)
+        if "user_api_keys" in err_str or "PGRST205" in err_str or "does not exist" in err_str.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="API keys table missing. Run Backend/supabase_migration_user_api_keys.sql in Supabase SQL Editor.",
+            ) from e
+        raise
+
+    return {
+        "api_key": full_key,
+        "key_id": ins["id"],
+        "scope": scope,
+        "chat_id": chat_id,
+        "message": "Save this key now; it will not be shown again.",
+    }
+
+
+@app.get("/api-keys/list")
+def list_user_api_keys_endpoint(email: str):
+    user = db_ops.get_user_by_email((email or "").strip().lower())
+    if not user or not _user_allowed_api_keys(user):
+        return {"keys": []}
+    try:
+        keys = db_ops.list_user_api_keys(user["id"])
+    except Exception as e:
+        err_str = str(e)
+        if "user_api_keys" in err_str or "PGRST205" in err_str:
+            return {"keys": [], "warning": "Run supabase_migration_user_api_keys.sql if you expect API keys here."}
+        raise
+    out = []
+    for k in keys:
+        lid = (k.get("lookup_id") or "") or ""
+        masked = (lid[:4] + "…" + lid[-4:]) if len(lid) >= 8 else "••••"
+        out.append(
+            {
+                "id": k["id"],
+                "scope": k["scope"],
+                "chat_id": k.get("chat_id"),
+                "label": k.get("label"),
+                "created_at": k.get("created_at"),
+                "key_hint": masked,
+            }
+        )
+    return {"keys": out}
+
+
+@app.post("/api-keys/revoke")
+def revoke_user_api_key_endpoint(body: RevokeUserApiKeyRequest):
+    email = (body.email or "").strip().lower()
+    user = db_ops.get_user_by_email(email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not _user_allowed_api_keys(user):
+        raise HTTPException(status_code=403, detail="Not allowed")
+    if not db_ops.revoke_user_api_key(user["id"], int(body.key_id)):
+        raise HTTPException(status_code=404, detail="Key not found or already revoked")
+    return {"ok": True}
+
+
+@app.post("/api/v1/chat")
+async def external_api_chat(request: Request, body: ExternalChatRequest):
+    raw = _parse_bearer_api_key(request.headers.get("Authorization"))
+    if not raw:
+        raise HTTPException(status_code=401, detail="Missing Authorization: Bearer <api_key>")
+    if not GROQ_API_KEY or not client:
+        return {"reply": "GROQ_API_KEY not found in .env"}
+
+    try:
+        return await asyncio.to_thread(_external_api_chat_sync, raw, body)
+    except UnauthorizedApiKeyError:
+        raise HTTPException(status_code=401, detail="Invalid or revoked API key") from None
+    except HTTPException:
+        raise
+    except Exception as e:
+        if _is_quota_error(e):
+            return {"reply": "Groq rate limit exceeded. Please try again in a few minutes or check https://console.groq.com/docs/rate-limits"}
+        err_str = str(e)
+        if "PGRST205" in err_str or "user_api_keys" in err_str:
+            return {"reply": "Server configuration error: API keys table may be missing."}
+        return {"reply": f"Error: {err_str}"}
+
 
 def _sanitize_filename(name: str) -> str:
     """Keep filename safe for storage."""
@@ -826,7 +1108,12 @@ def get_chats(email: str):
     if not user:
         return {"chats": []}
     chats = db_ops.get_chats_by_user_id(user["id"])
-    return {"chats": [{"name": c["name"], "display_id": c.get("display_id")} for c in chats]}
+    return {
+        "chats": [
+            {"id": c["id"], "name": c["name"], "display_id": c.get("display_id")}
+            for c in chats
+        ]
+    }
 
 
 @app.get("/messages/{email}/{chat_name}")
@@ -956,9 +1243,9 @@ def create_chat(body: CreateChatRequest):
         user = db_ops.create_user(body.email, display_id, "company" if company else "personal", company["id"] if company else None)
     existing = db_ops.get_chat_by_user_and_name(user["id"], body.name)
     if existing:
-        return {"ok": True, "name": body.name}
-    db_ops.create_chat(user["id"], body.name, user.get("display_id") or "")
-    return {"ok": True, "name": body.name}
+        return {"ok": True, "name": body.name, "chat_id": existing["id"]}
+    row = db_ops.create_chat(user["id"], body.name, user.get("display_id") or "")
+    return {"ok": True, "name": body.name, "chat_id": row["id"]}
 
 
 @app.patch("/chats/rename")
@@ -1054,12 +1341,17 @@ def get_user_info(email: str = ""):
 def get_admin_database(email: str = ""):
     if not _is_admin(email):
         raise HTTPException(status_code=403, detail="Admin only")
+    try:
+        api_keys = db_ops.get_all_user_api_keys()
+    except Exception:
+        api_keys = []
     return {
         "users": db_ops.get_all_users(),
         "chats": db_ops.get_all_chats(),
         "messages": db_ops.get_all_messages(),
         "documents": db_ops.get_all_documents(),
         "document_chunks": db_ops.get_all_document_chunks(),
+        "user_api_keys": api_keys,
     }
 
 

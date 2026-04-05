@@ -79,3 +79,23 @@ CREATE TABLE IF NOT EXISTS admins (
 -- Seed super admin (optional)
 INSERT INTO admins (email) VALUES ('parshant786yadav@gmail.com')
 ON CONFLICT (email) DO NOTHING;
+
+-- API keys for external chatbots (personal accounts only): per-chat or global documents
+CREATE TABLE IF NOT EXISTS user_api_keys (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  scope TEXT NOT NULL CHECK (scope IN ('chat', 'global')),
+  chat_id BIGINT REFERENCES chats(id) ON DELETE CASCADE,
+  lookup_id TEXT NOT NULL UNIQUE,
+  key_hash TEXT NOT NULL,
+  label TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  revoked_at TIMESTAMPTZ,
+  CONSTRAINT user_api_keys_scope_chat CHECK (
+    (scope = 'global' AND chat_id IS NULL)
+    OR (scope = 'chat' AND chat_id IS NOT NULL)
+  )
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_api_keys_user_id ON user_api_keys(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_api_keys_lookup_id ON user_api_keys(lookup_id);

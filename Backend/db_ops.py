@@ -13,6 +13,11 @@ def get_user_by_email(email: str) -> Optional[dict]:
     return _one(r.data)
 
 
+def get_user_by_id(user_id: int) -> Optional[dict]:
+    r = get_supabase().table("users").select("*").eq("id", user_id).execute()
+    return _one(r.data)
+
+
 def create_user(email: str, display_id: str, user_type: str = "personal", company_id: Optional[int] = None) -> dict:
     payload = {"email": email, "display_id": display_id, "user_type": user_type or "personal"}
     if company_id is not None:
@@ -47,6 +52,11 @@ def get_next_display_id(mode: str) -> str:
 
 def get_chat_by_user_and_name(user_id: int, chat_name: str) -> Optional[dict]:
     r = get_supabase().table("chats").select("*").eq("user_id", user_id).eq("name", chat_name).execute()
+    return _one(r.data)
+
+
+def get_chat_by_id(chat_id: int) -> Optional[dict]:
+    r = get_supabase().table("chats").select("*").eq("id", chat_id).execute()
     return _one(r.data)
 
 
@@ -130,6 +140,26 @@ def get_document_chunks_personal(user_id: int, chat_id: Optional[int]) -> list:
     docs = get_supabase().table("documents").select("id, chat_id").eq("user_id", user_id).execute()
     rows = docs.data or []
     doc_ids = [d["id"] for d in rows if d.get("chat_id") is None or d.get("chat_id") == chat_id]
+    if not doc_ids:
+        return []
+    r = get_supabase().table("document_chunks").select("*").in_("document_id", doc_ids).execute()
+    return r.data or []
+
+
+def get_document_chunks_chat_scoped(user_id: int, chat_id: int) -> list:
+    """Personal docs attached only to this chat (excludes global uploads and other chats)."""
+    docs = get_supabase().table("documents").select("id").eq("user_id", user_id).eq("chat_id", chat_id).is_("company_id", "null").execute()
+    doc_ids = [d["id"] for d in (docs.data or [])]
+    if not doc_ids:
+        return []
+    r = get_supabase().table("document_chunks").select("*").in_("document_id", doc_ids).execute()
+    return r.data or []
+
+
+def get_document_chunks_global_scoped(user_id: int) -> list:
+    """Personal global docs only (no chat_id, not company)."""
+    docs = get_supabase().table("documents").select("id").eq("user_id", user_id).is_("chat_id", "null").is_("company_id", "null").execute()
+    doc_ids = [d["id"] for d in (docs.data or [])]
     if not doc_ids:
         return []
     r = get_supabase().table("document_chunks").select("*").in_("document_id", doc_ids).execute()
@@ -247,6 +277,84 @@ def get_all_documents() -> list:
 
 def get_all_document_chunks() -> list:
     r = get_supabase().table("document_chunks").select("id, document_id, content").execute()
+    return r.data or []
+
+
+# ---------- User API keys (external chatbots) ----------
+def insert_user_api_key(
+    user_id: int,
+    scope: str,
+    chat_id: Optional[int],
+    lookup_id: str,
+    key_hash: str,
+    label: Optional[str] = None,
+) -> dict:
+    payload: dict[str, Any] = {
+        "user_id": user_id,
+        "scope": scope,
+        "lookup_id": lookup_id,
+        "key_hash": key_hash,
+    }
+    if label:
+        payload["label"] = label
+    if scope == "chat" and chat_id is not None:
+        payload["chat_id"] = chat_id
+    r = get_supabase().table("user_api_keys").insert(payload).execute()
+    return r.data[0]
+
+
+def get_user_api_key_by_lookup_id(lookup_id: str) -> Optional[dict]:
+    r = (
+        get_supabase()
+        .table("user_api_keys")
+        .select("*")
+        .eq("lookup_id", lookup_id)
+        .is_("revoked_at", "null")
+        .execute()
+    )
+    return _one(r.data)
+
+
+def list_user_api_keys(user_id: int) -> list:
+    r = (
+        get_supabase()
+        .table("user_api_keys")
+        .select("id, user_id, scope, chat_id, lookup_id, label, created_at, revoked_at")
+        .eq("user_id", user_id)
+        .is_("revoked_at", "null")
+        .order("id", desc=True)
+        .execute()
+    )
+    return r.data or []
+
+
+def revoke_user_api_key(user_id: int, key_id: int) -> bool:
+    from datetime import datetime, timezone
+
+    chk = (
+        get_supabase()
+        .table("user_api_keys")
+        .select("id")
+        .eq("id", key_id)
+        .eq("user_id", user_id)
+        .is_("revoked_at", "null")
+        .execute()
+    )
+    if not chk.data:
+        return False
+    ts = datetime.now(timezone.utc).isoformat()
+    get_supabase().table("user_api_keys").update({"revoked_at": ts}).eq("id", key_id).execute()
+    return True
+
+
+def get_all_user_api_keys() -> list:
+    r = (
+        get_supabase()
+        .table("user_api_keys")
+        .select("id, user_id, scope, chat_id, label, created_at, revoked_at")
+        .order("id", desc=True)
+        .execute()
+    )
     return r.data or []
 
 

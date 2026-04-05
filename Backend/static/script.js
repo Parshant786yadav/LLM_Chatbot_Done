@@ -8,6 +8,9 @@ function isSuperAdmin() {
 }
 let dbData = null;  // admin database view data
 let chats = [];
+/** @type {Record<string, number>} maps chat name -> server chat id (for API keys) */
+let chatIdByName = {};
+let cachedApiKeys = [];
 let currentChat = null;
 let globalDocuments = [];
 let chatDocuments = {};
@@ -497,7 +500,15 @@ async function loadUserData(email) {
         showChatListLoader();
         const chatRes = await fetch(API_BASE + "/chats/" + encodeURIComponent(email));
         const chatData = await chatRes.json();
-        chats = (chatData.chats || []).map(function (c) { return typeof c === "string" ? c : c.name; });
+        chatIdByName = {};
+        chats = (chatData.chats || []).map(function (c) {
+            if (typeof c === "string") return c;
+            if (c && c.name != null) {
+                if (c.id != null) chatIdByName[c.name] = c.id;
+                return c.name;
+            }
+            return String(c);
+        });
         renderChats();
 
         // Load global documents (only for personal mode) - backend returns only global (chat_id null)
@@ -556,6 +567,15 @@ async function loadUserData(email) {
             );
         }
 
+        if (loginMode === "personal") {
+            await refreshApiKeys();
+        } else {
+            cachedApiKeys = [];
+            renderGlobalApiKeysList();
+            renderChatApiKeysList();
+        }
+        updateApiKeysSectionVisibility();
+
     } catch (error) {
         console.error("Error loading user data:", error);
     }
@@ -584,6 +604,7 @@ function applyPersonalLoginUI(email) {
     var panel = document.getElementById("chatDocsPanel");
     if (panel) panel.style.display = "block";
     renderChatDocs();
+    updateApiKeysSectionVisibility();
 }
 
 function applyCompanyLoginUI(email) {
@@ -606,12 +627,15 @@ function applyCompanyLoginUI(email) {
     document.getElementById("companyDocHintEmployee").style.display = isHr ? "none" : "block";
     var panel = document.getElementById("chatDocsPanel");
     if (panel) panel.style.display = "none";
+    updateApiKeysSectionVisibility();
 }
 
 function logout() {
     closeProfileDropdown();
     loginMode = "guest";
     userEmail = null;
+    chatIdByName = {};
+    cachedApiKeys = [];
     clearGuestSession();
 try { localStorage.removeItem("currentChat"); } catch(e) {}
 
@@ -630,6 +654,11 @@ history.replaceState({}, document.title, window.location.pathname || "/");
     chatDocuments = {};
     companyDocuments = [];
     currentChat = null;
+
+    var gar = document.getElementById("globalApiKeyReveal");
+    if (gar) { gar.style.display = "none"; gar.textContent = ""; }
+    var car = document.getElementById("chatApiKeyReveal");
+    if (car) { car.style.display = "none"; car.textContent = ""; }
 
     document.getElementById("chatList").innerHTML = "";
     document.getElementById("chatArea").innerHTML = "";
@@ -720,6 +749,10 @@ async function claimGuestChatIfAny(email) {
         var gi = chats.indexOf(guestChatId);
         if (gi !== -1) chats[gi] = newName;
         else if (chats.indexOf(newName) === -1) chats.unshift(newName);
+        if (chatIdByName[guestChatId] !== undefined) {
+            chatIdByName[newName] = chatIdByName[guestChatId];
+            delete chatIdByName[guestChatId];
+        }
         renderChats();
 
         try {
@@ -795,8 +828,9 @@ async function createNewChatAndReturnName() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: userEmail, name: chatName, mode: loginMode || "personal" })
         });
-        var createData = await createRes.json();
+        var createData = await createRes.json().catch(function () { return {}; });
         if (!createRes.ok && createRes.status !== 200) return null;
+        if (createData.chat_id != null) chatIdByName[chatName] = createData.chat_id;
     } catch (err) {
         console.error("Create chat error", err);
         return null;
@@ -937,6 +971,10 @@ async function renameChatOnServer(oldName, newName) {
                 chatDocuments[newName] = chatDocuments[oldName];
                 delete chatDocuments[oldName];
             }
+            if (chatIdByName[oldName] !== undefined) {
+                chatIdByName[newName] = chatIdByName[oldName];
+                delete chatIdByName[oldName];
+            }
             renderChats();
         } else {
             const msg = Array.isArray(data.detail) ? data.detail.map(function (x) { return x.msg || x; }).join(" ") : (data.detail || "Rename failed");
@@ -996,6 +1034,168 @@ async function selectChat(chatName) {
     } catch (error) {
         console.error("Error loading messages:", error);
         showStartView();
+    }
+
+    updateApiKeysSectionVisibility();
+    renderChatApiKeysList();
+}
+
+/* ---------------- USER API KEYS (personal) ---------------- */
+
+function updateApiKeysSectionVisibility() {
+    var g = document.getElementById("globalApiKeysSection");
+    var c = document.getElementById("chatApiKeysSection");
+    var personal = loginMode === "personal" && !!userEmail;
+    if (g) g.style.display = personal ? "block" : "none";
+    if (c) c.style.display = personal && currentChat ? "block" : "none";
+}
+
+async function refreshApiKeys() {
+    if (!userEmail || loginMode !== "personal") return;
+    try {
+        var res = await fetch(API_BASE + "/api-keys/list?email=" + encodeURIComponent(userEmail));
+        var data = await res.json().catch(function () { return {}; });
+        cachedApiKeys = data.keys || [];
+        if (data.warning) console.warn(data.warning);
+        renderGlobalApiKeysList();
+        renderChatApiKeysList();
+    } catch (e) {
+        console.error("refreshApiKeys", e);
+    }
+}
+
+function renderGlobalApiKeysList() {
+    var ul = document.getElementById("globalApiKeysList");
+    if (!ul) return;
+    ul.innerHTML = "";
+    cachedApiKeys.filter(function (k) { return k.scope === "global"; }).forEach(function (k) {
+        var li = document.createElement("li");
+        var span = document.createElement("span");
+        span.className = "api-key-meta";
+        span.textContent = (k.label || "—") + " · " + (k.key_hint || "••••");
+        li.appendChild(span);
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "api-keys-revoke";
+        btn.textContent = "Revoke";
+        btn.onclick = function () { revokeApiKey(k.id); };
+        li.appendChild(btn);
+        ul.appendChild(li);
+    });
+}
+
+function renderChatApiKeysList() {
+    var ul = document.getElementById("chatApiKeysList");
+    if (!ul) return;
+    ul.innerHTML = "";
+    if (!currentChat) return;
+    var cid = chatIdByName[currentChat];
+    if (cid == null) {
+        var miss = document.createElement("li");
+        miss.className = "api-keys-li-muted";
+        miss.style.color = "#94a3b8";
+        miss.textContent = "Chat id not loaded — switch chat or refresh the page.";
+        ul.appendChild(miss);
+        return;
+    }
+    cachedApiKeys.filter(function (k) { return k.scope === "chat" && Number(k.chat_id) === Number(cid); }).forEach(function (k) {
+        var li = document.createElement("li");
+        var span = document.createElement("span");
+        span.className = "api-key-meta";
+        span.textContent = (k.label || "—") + " · " + (k.key_hint || "••••");
+        li.appendChild(span);
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "api-keys-revoke";
+        btn.textContent = "Revoke";
+        btn.onclick = function () { revokeApiKey(k.id); };
+        li.appendChild(btn);
+        ul.appendChild(li);
+    });
+}
+
+async function createGlobalApiKey() {
+    if (!userEmail || loginMode !== "personal") return;
+    var labelIn = document.getElementById("globalApiKeyLabel");
+    var label = labelIn ? labelIn.value.trim() : "";
+    var reveal = document.getElementById("globalApiKeyReveal");
+    try {
+        var res = await fetch(API_BASE + "/api-keys/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: userEmail, scope: "global", label: label || null })
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+            toast((data.detail && (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail))) || "Could not create key", "error");
+            return;
+        }
+        if (reveal) {
+            reveal.style.display = "block";
+            reveal.textContent = "Save this key now (shown once): " + (data.api_key || "");
+        }
+        if (labelIn) labelIn.value = "";
+        await refreshApiKeys();
+        toast("Global API key created.", "success");
+    } catch (e) {
+        console.error(e);
+        toast("Could not create API key.", "error");
+    }
+}
+
+async function createChatApiKey() {
+    if (!userEmail || !currentChat || loginMode !== "personal") return;
+    var labelIn = document.getElementById("chatApiKeyLabel");
+    var label = labelIn ? labelIn.value.trim() : "";
+    var reveal = document.getElementById("chatApiKeyReveal");
+    try {
+        var res = await fetch(API_BASE + "/api-keys/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                email: userEmail,
+                scope: "chat",
+                chat_name: currentChat,
+                label: label || null
+            })
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+            toast((data.detail && (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail))) || "Could not create key", "error");
+            return;
+        }
+        if (reveal) {
+            reveal.style.display = "block";
+            reveal.textContent = "Save this key now (shown once): " + (data.api_key || "");
+        }
+        if (labelIn) labelIn.value = "";
+        await refreshApiKeys();
+        toast("Chat API key created.", "success");
+    } catch (e) {
+        console.error(e);
+        toast("Could not create API key.", "error");
+    }
+}
+
+async function revokeApiKey(keyId) {
+    if (!userEmail) return;
+    if (!(await confirmDialog("Revoke this API key? Apps using it will stop working.", { confirmLabel: "Revoke", cancelLabel: "Cancel", danger: true }))) return;
+    try {
+        var res = await fetch(API_BASE + "/api-keys/revoke", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: userEmail, key_id: keyId })
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+            toast(data.detail || "Could not revoke.", "error");
+            return;
+        }
+        await refreshApiKeys();
+        toast("Key revoked.", "success");
+    } catch (e) {
+        console.error(e);
+        toast("Could not revoke key.", "error");
     }
 }
 

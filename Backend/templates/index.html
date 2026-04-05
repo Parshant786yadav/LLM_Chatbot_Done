@@ -84,6 +84,17 @@
                 </div>
                 <p id="companyDocCountEmployee" class="company-doc-hint company-doc-count-employee" style="display: none;"></p>
                 <p id="companyDocHintEmployee" class="company-doc-hint" style="display: none;">Only HR (hr@yourcompany) can upload documents. You can ask questions in chat to get details from the documents HR has uploaded.</p>
+                <div id="globalApiKeysSection" class="api-keys-section" style="display: none;">
+                    <h4 class="api-keys-title">API keys (global documents)</h4>
+                    <p class="api-keys-desc">Embed in your site; answers use only documents uploaded here (global), not chat-specific files.</p>
+                    <div class="api-keys-actions">
+                        <input type="text" id="globalApiKeyLabel" class="api-keys-input" placeholder="Label (optional)" maxlength="80">
+                        <button type="button" class="api-keys-btn" id="globalApiKeyCreateBtn" onclick="createGlobalApiKey()">Create key</button>
+                        <button type="button" class="api-keys-btn api-keys-btn--ghost" onclick="refreshApiKeys()">Refresh list</button>
+                    </div>
+                    <p id="globalApiKeyReveal" class="api-keys-reveal" style="display: none;" aria-live="polite"></p>
+                    <ul id="globalApiKeysList" class="api-keys-list"></ul>
+                </div>
             </div>
         </div>
 
@@ -114,6 +125,16 @@
                             <div class="chat-docs-mobile-dropdown" id="chatDocsMobileDropdown">
                                 <button type="button" class="chat-docs-mobile-upload-btn" id="chatDocsMobileUploadBtn" onclick="triggerChatDocUploadFromMobile()">Upload file</button>
                             </div>
+                        </div>
+                        <div id="chatApiKeysSection" class="api-keys-section api-keys-section--inline" style="display: none;">
+                            <h4 class="api-keys-title">API key (this chat only)</h4>
+                            <p class="api-keys-desc">Answers only use PDFs uploaded in this chat.</p>
+                            <div class="api-keys-actions">
+                                <input type="text" id="chatApiKeyLabel" class="api-keys-input" placeholder="Label (optional)" maxlength="80">
+                                <button type="button" class="api-keys-btn" id="chatApiKeyCreateBtn" onclick="createChatApiKey()">Create key</button>
+                            </div>
+                            <p id="chatApiKeyReveal" class="api-keys-reveal" style="display: none;" aria-live="polite"></p>
+                            <ul id="chatApiKeysList" class="api-keys-list"></ul>
                         </div>
                     </div>
                 </div>
@@ -156,6 +177,7 @@
                     <button type="button" class="db-tab" data-table="messages">Messages</button>
                     <button type="button" class="db-tab" data-table="documents">Documents</button>
                     <button type="button" class="db-tab" data-table="document_chunks">Document chunks</button>
+                    <button type="button" class="db-tab" data-table="user_api_keys">API keys</button>
                 </div>
                 <div id="dbTableContent" class="db-table-content"></div>
             </div>
