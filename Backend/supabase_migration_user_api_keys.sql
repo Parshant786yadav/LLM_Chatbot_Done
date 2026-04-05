@@ -1,5 +1,8 @@
 -- Run once in Supabase SQL Editor (existing projects that already ran supabase_schema.sql).
 -- API keys: per-chat (only that chat's uploads) or global (only account global uploads).
+--
+-- Alternative: set SUPABASE_DB_URL or DATABASE_URL (Postgres URI from Supabase → Project Settings → Database)
+-- on your server with psycopg2-binary installed; the backend can create this table automatically on startup.
 
 CREATE TABLE IF NOT EXISTS user_api_keys (
   id BIGSERIAL PRIMARY KEY,

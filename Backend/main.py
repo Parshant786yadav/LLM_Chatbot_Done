@@ -33,6 +33,11 @@ from rag import cosine_similarity
 
 from database import get_supabase
 import db_ops
+from schema_ensure import (
+    try_ensure_user_api_keys_table,
+    is_missing_user_api_keys_table_error,
+    detail_table_missing_help,
+)
 
 
 from fastapi import FastAPI, Request
@@ -207,6 +212,17 @@ async def startup():
         print(f"[Resend] OTP from address at startup: {_resolve_resend_from()}", flush=True)
     except Exception as e:
         print(f"[Resend] Could not resolve sender at startup: {e}", flush=True)
+    try:
+        if try_ensure_user_api_keys_table():
+            print("[API_KEYS] user_api_keys table is available.", flush=True)
+        else:
+            print(
+                "[API_KEYS] user_api_keys not available yet. "
+                "Run supabase_migration_user_api_keys.sql or set SUPABASE_DB_URL / DATABASE_URL for auto-create.",
+                flush=True,
+            )
+    except Exception as e:
+        print(f"[API_KEYS] Startup ensure failed (non-fatal): {e}", flush=True)
     # Start background cache cleanup task
     asyncio.create_task(_cache_cleanup_task())
 
@@ -811,6 +827,7 @@ class UnauthorizedApiKeyError(Exception):
 
 
 def _external_api_chat_sync(raw_key: str, body: ExternalChatRequest) -> dict:
+    try_ensure_user_api_keys_table()
     row = _resolve_user_api_key_row(raw_key)
     if not row:
         raise UnauthorizedApiKeyError()
@@ -872,17 +889,20 @@ def create_user_api_key(body: CreateUserApiKeyRequest):
         chat_id = int(chat["id"])
 
     label = (body.label or "").strip() or None
+    try_ensure_user_api_keys_table()
+    lookup_id, full_key, key_hash = _generate_user_api_key_tuple()
     try:
-        lookup_id, full_key, key_hash = _generate_user_api_key_tuple()
         ins = db_ops.insert_user_api_key(int(user["id"]), scope, chat_id, lookup_id, key_hash, label)
     except Exception as e:
         err_str = str(e)
-        if "user_api_keys" in err_str or "PGRST205" in err_str or "does not exist" in err_str.lower():
-            raise HTTPException(
-                status_code=503,
-                detail="API keys table missing. Run Backend/supabase_migration_user_api_keys.sql in Supabase SQL Editor.",
-            ) from e
-        raise
+        if is_missing_user_api_keys_table_error(err_str):
+            try_ensure_user_api_keys_table(reset=True)
+            try:
+                ins = db_ops.insert_user_api_key(int(user["id"]), scope, chat_id, lookup_id, key_hash, label)
+            except Exception as e2:
+                raise HTTPException(status_code=503, detail=detail_table_missing_help()) from e2
+        else:
+            raise
 
     return {
         "api_key": full_key,
@@ -898,13 +918,19 @@ def list_user_api_keys_endpoint(email: str):
     user = db_ops.get_user_by_email((email or "").strip().lower())
     if not user or not _user_allowed_api_keys(user):
         return {"keys": []}
+    try_ensure_user_api_keys_table()
     try:
         keys = db_ops.list_user_api_keys(user["id"])
     except Exception as e:
         err_str = str(e)
-        if "user_api_keys" in err_str or "PGRST205" in err_str:
-            return {"keys": [], "warning": "Run supabase_migration_user_api_keys.sql if you expect API keys here."}
-        raise
+        if is_missing_user_api_keys_table_error(err_str):
+            try_ensure_user_api_keys_table(reset=True)
+            try:
+                keys = db_ops.list_user_api_keys(user["id"])
+            except Exception:
+                return {"keys": [], "warning": detail_table_missing_help()}
+        else:
+            raise
     out = []
     for k in keys:
         lid = (k.get("lookup_id") or "") or ""
@@ -930,6 +956,7 @@ def revoke_user_api_key_endpoint(body: RevokeUserApiKeyRequest):
         raise HTTPException(status_code=404, detail="User not found")
     if not _user_allowed_api_keys(user):
         raise HTTPException(status_code=403, detail="Not allowed")
+    try_ensure_user_api_keys_table()
     if not db_ops.revoke_user_api_key(user["id"], int(body.key_id)):
         raise HTTPException(status_code=404, detail="Key not found or already revoked")
     return {"ok": True}
@@ -953,8 +980,8 @@ async def external_api_chat(request: Request, body: ExternalChatRequest):
         if _is_quota_error(e):
             return {"reply": "Groq rate limit exceeded. Please try again in a few minutes or check https://console.groq.com/docs/rate-limits"}
         err_str = str(e)
-        if "PGRST205" in err_str or "user_api_keys" in err_str:
-            return {"reply": "Server configuration error: API keys table may be missing."}
+        if is_missing_user_api_keys_table_error(err_str):
+            return {"reply": detail_table_missing_help()}
         return {"reply": f"Error: {err_str}"}
 
 
