@@ -659,6 +659,7 @@ history.replaceState({}, document.title, window.location.pathname || "/");
     if (gar) { gar.style.display = "none"; gar.textContent = ""; }
     var car = document.getElementById("chatApiKeyReveal");
     if (car) { car.style.display = "none"; car.textContent = ""; }
+    closeChatApiKeyPopover();
 
     document.getElementById("chatList").innerHTML = "";
     document.getElementById("chatArea").innerHTML = "";
@@ -976,6 +977,7 @@ async function renameChatOnServer(oldName, newName) {
                 delete chatIdByName[oldName];
             }
             renderChats();
+            closeChatApiKeyPopover();
         } else {
             const msg = Array.isArray(data.detail) ? data.detail.map(function (x) { return x.msg || x; }).join(" ") : (data.detail || "Rename failed");
             toast(msg, "error");
@@ -989,6 +991,7 @@ async function renameChatOnServer(oldName, newName) {
 async function selectChat(chatName) {
     closeSidebar();
     closeDatabaseView();
+    closeChatApiKeyPopover();
     currentChat = chatName;
     try { localStorage.setItem("currentChat", chatName); } catch(e) {}
     document.getElementById("chatTitle").innerText = chatName;
@@ -1044,10 +1047,47 @@ async function selectChat(chatName) {
 
 function updateApiKeysSectionVisibility() {
     var g = document.getElementById("globalApiKeysSection");
-    var c = document.getElementById("chatApiKeysSection");
+    var tbar = document.getElementById("chatApiKeyToolbar");
     var personal = loginMode === "personal" && !!userEmail;
     if (g) g.style.display = personal ? "block" : "none";
-    if (c) c.style.display = personal && currentChat ? "block" : "none";
+    if (tbar) tbar.style.display = personal && currentChat ? "block" : "none";
+    if (!personal || !currentChat) closeChatApiKeyPopover();
+}
+
+function closeChatApiKeyPopover() {
+    var pop = document.getElementById("chatApiKeyPopover");
+    var btn = document.getElementById("chatApiKeyPopoverBtn");
+    if (pop) {
+        pop.classList.remove("chat-api-key-popover--open");
+        pop.setAttribute("aria-hidden", "true");
+    }
+    if (btn) btn.setAttribute("aria-expanded", "false");
+    document.removeEventListener("click", closeChatApiKeyPopoverOnOutside);
+}
+
+function closeChatApiKeyPopoverOnOutside(e) {
+    var wrap = document.querySelector(".chat-api-key-toolbar-inner");
+    if (wrap && !wrap.contains(e.target)) {
+        closeChatApiKeyPopover();
+    }
+}
+
+function toggleChatApiKeyPopover(e) {
+    if (e) e.stopPropagation();
+    var pop = document.getElementById("chatApiKeyPopover");
+    var btn = document.getElementById("chatApiKeyPopoverBtn");
+    if (!pop || !btn) return;
+    if (pop.classList.contains("chat-api-key-popover--open")) {
+        closeChatApiKeyPopover();
+        return;
+    }
+    closeChatDocsUploadDropdown();
+    pop.classList.add("chat-api-key-popover--open");
+    pop.setAttribute("aria-hidden", "false");
+    btn.setAttribute("aria-expanded", "true");
+    setTimeout(function () {
+        document.addEventListener("click", closeChatApiKeyPopoverOnOutside);
+    }, 0);
 }
 
 async function refreshApiKeys() {
@@ -1425,15 +1465,15 @@ async function toggleCompanyShowCountToEmployees() {
 
 /* Move #chatDocs into the + dropdown on mobile so one anchored menu (avoids stray thin bar). */
 function layoutChatDocsPanelForViewport() {
-    var panel = document.getElementById("chatDocsPanel");
+    var main = document.querySelector(".chat-docs-main");
     var ul = document.getElementById("chatDocs");
     var dropdown = document.getElementById("chatDocsMobileDropdown");
     var mobileWrap = document.getElementById("chatDocsMobileWrap");
-    if (!panel || !ul || !dropdown || !mobileWrap) return;
+    if (!main || !ul || !dropdown || !mobileWrap) return;
     if (window.innerWidth <= 768) {
         dropdown.appendChild(ul);
     } else {
-        panel.insertBefore(ul, mobileWrap);
+        main.insertBefore(ul, mobileWrap);
     }
 }
 
@@ -1447,6 +1487,7 @@ function toggleChatDocsUploadDropdown() {
     var dropdown = document.getElementById("chatDocsMobileDropdown");
     var plus = document.getElementById("chatDocsMobilePlus");
     if (!dropdown || !plus) return;
+    closeChatApiKeyPopover();
     var isOpen = dropdown.classList.toggle("open");
     plus.setAttribute("aria-expanded", isOpen);
     var list = document.getElementById("chatDocs");

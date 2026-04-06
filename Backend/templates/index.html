@@ -115,26 +115,35 @@
                     </button>
                     <h3 id="chatTitle">DocuMind</h3>
                     <div id="chatDocsPanel" class="chat-docs-panel">
-                        <h4 class="chat-docs-panel-title">Chat Documents</h4>
-                        <input type="file" id="chatUpload" accept=".pdf,application/pdf" onchange="uploadChatDoc()" class="chat-docs-upload">
-                        <button type="button" class="documents-toggle chat-docs-toggle" id="chatDocsToggle" onclick="toggleChatDocsList()">Documents uploaded 0</button>
-                        <ul id="chatDocs" class="chat-docs-list doc-list doc-list-collapsed"></ul>
-                        <div class="chat-docs-mobile" id="chatDocsMobileWrap" aria-label="Chat documents">
-                            <button type="button" class="chat-docs-mobile-plus" id="chatDocsMobilePlus" onclick="toggleChatDocsUploadDropdown()" aria-expanded="false" aria-haspopup="true" title="Documents">+</button>
-                            <span class="chat-docs-mobile-count" id="chatDocsMobileCount">0 docs</span>
-                            <div class="chat-docs-mobile-dropdown" id="chatDocsMobileDropdown">
-                                <button type="button" class="chat-docs-mobile-upload-btn" id="chatDocsMobileUploadBtn" onclick="triggerChatDocUploadFromMobile()">Upload file</button>
+                        <div class="chat-docs-panel-inner">
+                            <div id="chatApiKeyToolbar" class="chat-api-key-toolbar" style="display: none;">
+                                <div class="chat-api-key-toolbar-inner">
+                                    <button type="button" class="chat-api-key-trigger" id="chatApiKeyPopoverBtn" onclick="toggleChatApiKeyPopover(event)" aria-expanded="false" aria-haspopup="true" aria-controls="chatApiKeyPopover">Create API key</button>
+                                    <div id="chatApiKeyPopover" class="chat-api-key-popover" role="dialog" aria-labelledby="chatApiKeyPopoverHeading" aria-hidden="true">
+                                        <p id="chatApiKeyPopoverHeading" class="api-keys-title">API key (this chat only)</p>
+                                        <p class="api-keys-desc">Answers only use PDFs uploaded in this chat.</p>
+                                        <div class="api-keys-actions">
+                                            <input type="text" id="chatApiKeyLabel" class="api-keys-input" placeholder="Label (optional)" maxlength="80">
+                                            <button type="button" class="api-keys-btn" id="chatApiKeyCreateBtn" onclick="createChatApiKey()">Create key</button>
+                                        </div>
+                                        <p id="chatApiKeyReveal" class="api-keys-reveal" style="display: none;" aria-live="polite"></p>
+                                        <ul id="chatApiKeysList" class="api-keys-list"></ul>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <div id="chatApiKeysSection" class="api-keys-section api-keys-section--inline" style="display: none;">
-                            <h4 class="api-keys-title">API key (this chat only)</h4>
-                            <p class="api-keys-desc">Answers only use PDFs uploaded in this chat.</p>
-                            <div class="api-keys-actions">
-                                <input type="text" id="chatApiKeyLabel" class="api-keys-input" placeholder="Label (optional)" maxlength="80">
-                                <button type="button" class="api-keys-btn" id="chatApiKeyCreateBtn" onclick="createChatApiKey()">Create key</button>
+                            <div class="chat-docs-main">
+                                <h4 class="chat-docs-panel-title">Chat Documents</h4>
+                                <input type="file" id="chatUpload" accept=".pdf,application/pdf" onchange="uploadChatDoc()" class="chat-docs-upload">
+                                <button type="button" class="documents-toggle chat-docs-toggle" id="chatDocsToggle" onclick="toggleChatDocsList()">Documents uploaded 0</button>
+                                <ul id="chatDocs" class="chat-docs-list doc-list doc-list-collapsed"></ul>
+                                <div class="chat-docs-mobile" id="chatDocsMobileWrap" aria-label="Chat documents">
+                                    <button type="button" class="chat-docs-mobile-plus" id="chatDocsMobilePlus" onclick="toggleChatDocsUploadDropdown()" aria-expanded="false" aria-haspopup="true" title="Documents">+</button>
+                                    <span class="chat-docs-mobile-count" id="chatDocsMobileCount">0 docs</span>
+                                    <div class="chat-docs-mobile-dropdown" id="chatDocsMobileDropdown">
+                                        <button type="button" class="chat-docs-mobile-upload-btn" id="chatDocsMobileUploadBtn" onclick="triggerChatDocUploadFromMobile()">Upload file</button>
+                                    </div>
+                                </div>
                             </div>
-                            <p id="chatApiKeyReveal" class="api-keys-reveal" style="display: none;" aria-live="polite"></p>
-                            <ul id="chatApiKeysList" class="api-keys-list"></ul>
                         </div>
                     </div>
                 </div>

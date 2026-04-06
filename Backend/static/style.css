@@ -732,13 +732,42 @@ select,
         position: relative;
         width: auto !important;
         min-width: 0 !important;
-        max-width: 56px;
+        max-width: min(200px, 46vw);
         flex-shrink: 0;
         flex-grow: 0;
         padding: 0 !important;
         display: flex;
         flex-direction: column;
+        align-items: stretch;
+    }
+
+    .chat-docs-panel-inner {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 6px;
+        width: 100%;
+    }
+
+    .chat-docs-main {
+        display: flex;
+        flex-direction: column;
         align-items: center;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .chat-api-key-toolbar-inner {
+        position: relative;
+        z-index: 65;
+    }
+
+    .chat-api-key-trigger {
+        font-size: 10px;
+        padding: 6px 8px;
+        white-space: nowrap;
+        max-width: 72px;
+        line-height: 1.2;
     }
 
     .chat-docs-panel-title,
@@ -748,7 +777,7 @@ select,
     }
 
     /* Desktop list stays in panel; on mobile JS moves #chatDocs into .chat-docs-mobile-dropdown */
-    .chat-docs-panel > #chatDocs {
+    .chat-docs-main > #chatDocs {
         display: none;
     }
 
@@ -1153,9 +1182,75 @@ select,
     border-radius: 0;
 }
 
+.chat-docs-panel-inner {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+}
+
+.chat-docs-main {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Chat header: API key button (left) + documents (right) */
+.chat-api-key-toolbar {
+    flex-shrink: 0;
+}
+
+.chat-api-key-toolbar-inner {
+    position: relative;
+}
+
+.chat-api-key-trigger {
+    display: inline-block;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #1e40af;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+
+.chat-api-key-trigger:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+
+.chat-api-key-popover {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: auto;
+    min-width: min(280px, calc(100vw - 32px));
+    max-width: min(320px, calc(100vw - 32px));
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+    z-index: 80;
+    box-sizing: border-box;
+}
+
+.chat-api-key-popover.chat-api-key-popover--open {
+    display: block;
+}
+
+.chat-api-key-popover .api-keys-input {
+    max-width: 100%;
+}
+
 @media (min-width: 769px) {
     .chat-docs-panel {
-        width: 200px;
+        width: 300px;
         padding: 12px;
     }
 }
