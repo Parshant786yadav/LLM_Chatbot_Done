@@ -1636,10 +1636,11 @@ async function sendMessage() {
     }
     addTypingIndicator();
 
-    fetch(API_BASE + "/chat", {
+    fetch(API_BASE + "/chat/stream", {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            Accept: "text/event-stream"
         },
         body: JSON.stringify({
             mode: userEmail ? loginMode : "personal",
@@ -1649,33 +1650,12 @@ async function sendMessage() {
         })
     })
     .then(function (res) {
-        var ct = res.headers.get("Content-Type") || "";
-        if (!ct.includes("application/json")) {
-            if (!res.ok) {
-                return res.text().then(function (t) {
-                    throw new Error(res.status + " " + (t || res.statusText));
-                });
-            }
-            throw new Error("Server did not return JSON.");
-        }
-        return res.json().then(function (data) {
-            if (!res.ok) {
-                var msg = data.message || res.status + " " + res.statusText;
-                if (Array.isArray(data.detail)) {
-                    msg = data.detail.map(function (d) { return d.msg || JSON.stringify(d); }).join("; ");
-                } else if (data.detail) {
-                    msg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
-                }
-                throw new Error(msg);
-            }
-            return data;
-        });
+        return consumeChatStreamResponse(res);
     })
-    .then(function (data) {
-        removeTypingIndicator();
-        var reply = (data && data.reply != null) ? String(data.reply) : "No reply from server.";
-        addMessage(reply, "bot");
-        if (!userEmail) setGuestMessageCount(getGuestMessageCount() + 1);
+    .then(function (result) {
+        if (result && result.ok && !userEmail) {
+            setGuestMessageCount(getGuestMessageCount() + 1);
+        }
     })
     .catch(function (error) {
         console.error("Error:", error);
@@ -1708,6 +1688,114 @@ function addTypingIndicator() {
 function removeTypingIndicator() {
     var el = document.querySelector(".typing-indicator-wrapper");
     if (el) el.remove();
+}
+
+/** Empty bot bubble for SSE chunks (same layout as addMessage role bot). */
+function createStreamingBotMessage() {
+    var chatArea = document.getElementById("chatArea");
+    var wrapper = document.createElement("div");
+    wrapper.className = "message-row";
+    wrapper.style.display = "flex";
+    wrapper.style.alignItems = "flex-start";
+    wrapper.style.marginBottom = "10px";
+    var avatar = document.createElement("img");
+    avatar.className = "message-avatar";
+    avatar.src = "https://cdn-icons-png.flaticon.com/512/4712/4712027.png";
+    var messageDiv = document.createElement("div");
+    messageDiv.className = "message bot";
+    messageDiv.innerText = "";
+    wrapper.appendChild(avatar);
+    wrapper.appendChild(messageDiv);
+    chatArea.appendChild(wrapper);
+    scrollChatToBottomSmooth();
+    return {
+        append: function (s) {
+            messageDiv.innerText += s;
+            scrollChatToBottomSmooth();
+        }
+    };
+}
+
+/**
+ * Read POST /chat/stream SSE: JSON lines data: {"t":"d","c":"..."} | {"t":"done"} | {"t":"e","m":"..."}
+ * @returns {Promise<{ ok: boolean, hadAssistantBubble: boolean }>}
+ */
+function consumeChatStreamResponse(res) {
+    if (!res.ok) {
+        return res.text().then(function (t) {
+            throw new Error(res.status + " " + (t || res.statusText));
+        });
+    }
+    if (!res.body || typeof res.body.getReader !== "function") {
+        return Promise.reject(new Error("Streaming not supported in this browser."));
+    }
+    var reader = res.body.getReader();
+    var dec = new TextDecoder();
+    var buf = "";
+    var streamBubble = null;
+    var sawDone = false;
+    var sawError = false;
+
+    function parseSseBlocks(text) {
+        var parts = text.split("\n\n");
+        for (var i = 0; i < parts.length; i++) {
+            var block = parts[i].trim();
+            if (!block) continue;
+            var lines = block.split("\n");
+            for (var j = 0; j < lines.length; j++) {
+                var ln = lines[j].trim();
+                if (ln.indexOf("data:") !== 0) continue;
+                var payload = ln.slice(5).trim();
+                var ev;
+                try {
+                    ev = JSON.parse(payload);
+                } catch (e) {
+                    continue;
+                }
+                if (ev.t === "d" && ev.c != null) {
+                    removeTypingIndicator();
+                    if (!streamBubble) streamBubble = createStreamingBotMessage();
+                    streamBubble.append(String(ev.c));
+                } else if (ev.t === "done") {
+                    removeTypingIndicator();
+                    sawDone = true;
+                } else if (ev.t === "e") {
+                    removeTypingIndicator();
+                    sawError = true;
+                    var em = ev.m != null ? String(ev.m) : "Unknown error";
+                    if (streamBubble) {
+                        streamBubble.append("\n\n" + em);
+                    } else {
+                        addMessage("Error: " + em, "bot");
+                    }
+                }
+            }
+        }
+    }
+
+    function pump() {
+        return reader.read().then(function (x) {
+            if (x.value) {
+                buf += dec.decode(x.value, { stream: !x.done });
+            }
+            if (x.done) {
+                parseSseBlocks(buf);
+                buf = "";
+                removeTypingIndicator();
+                if (!sawDone && !sawError && !streamBubble) {
+                    addMessage("No reply from server.", "bot");
+                }
+                return { ok: sawDone && !sawError, hadAssistantBubble: !!streamBubble };
+            }
+            var lastSep = buf.lastIndexOf("\n\n");
+            if (lastSep !== -1) {
+                parseSseBlocks(buf.slice(0, lastSep + 2));
+                buf = buf.slice(lastSep + 2);
+            }
+            return pump();
+        });
+    }
+    return pump();
 }
 
 function addMessage(text, role) {

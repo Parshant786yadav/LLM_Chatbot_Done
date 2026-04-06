@@ -788,9 +788,21 @@ select,
         display: none !important;
     }
 
-    .chat-api-key-label-short,
     .chat-docs-upload-label-short {
+        display: none !important;
+    }
+
+    .chat-api-key-label-short {
         display: inline !important;
+    }
+
+    .chat-docs-upload-icon {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.35rem;
+        font-weight: 400;
+        line-height: 1;
     }
 
     .chat-api-key-trigger {
@@ -801,11 +813,20 @@ select,
         flex-shrink: 0;
     }
 
+    /* Mobile: compact + control for chat PDF upload (icon only) */
     .chat-docs-upload-trigger {
-        font-size: 9px;
-        padding: 5px 8px;
+        font-size: 0;
+        padding: 0;
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
         white-space: nowrap;
-        line-height: 1.2;
+        line-height: 1;
         flex-shrink: 0;
     }
 
@@ -1060,12 +1081,13 @@ select,
     display: flex;
     flex-direction: row;
     align-items: flex-start;
+    justify-content: flex-end;
     gap: 10px;
     width: 100%;
 }
 
 .chat-docs-main {
-    flex: 1;
+    flex: 0 0 auto;
     min-width: 0;
     display: flex;
     flex-direction: row;
@@ -1122,7 +1144,7 @@ select,
     max-width: 100%;
 }
 
-/* Chat header: API key button (left) + documents (right) */
+/* Chat header: Upload document + Create API key (grouped, end-aligned) */
 .chat-api-key-toolbar {
     flex-shrink: 0;
 }
@@ -1155,6 +1177,10 @@ select,
     display: none;
 }
 
+.chat-docs-upload-icon {
+    display: none;
+}
+
 .chat-api-key-label-full,
 .chat-docs-upload-label-full {
     display: inline;
@@ -1164,8 +1190,8 @@ select,
     display: none;
     position: absolute;
     top: calc(100% + 6px);
-    left: 0;
-    right: auto;
+    left: auto;
+    right: 0;
     min-width: min(280px, calc(100vw - 32px));
     max-width: min(320px, calc(100vw - 32px));
     padding: 12px 14px;

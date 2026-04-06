@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Iterator
 import os
 import secrets
 import bcrypt
@@ -185,6 +185,29 @@ class MessageCache:
 # Global message cache instance
 _message_cache = MessageCache(ttl_seconds=60)
 
+# Main event loop (for scheduling async cache invalidation from sync streaming routes).
+_app_loop: Optional[asyncio.AbstractEventLoop] = None
+
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
+
+
+def _format_sse(obj: dict) -> bytes:
+    return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n".encode("utf-8")
+
+
+def _schedule_message_cache_invalidate(user_id: int, chat_id: int) -> None:
+    loop = _app_loop
+    if loop is None or not loop.is_running():
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(_message_cache.invalidate(user_id, chat_id), loop)
+    except Exception:
+        pass
+
 
 app = FastAPI(title="Enterprise AI Assistant Backend")
 
@@ -206,6 +229,8 @@ def home(request: Request):
 
 @app.on_event("startup")
 async def startup():
+    global _app_loop
+    _app_loop = asyncio.get_running_loop()
     _ensure_storage_bucket()
     # Log effective Resend sender so Render logs confirm env (not sandbox) is loaded.
     try:
@@ -520,6 +545,23 @@ def _call_groq_with_history(groq_client: Groq, model: str, history_user_contents
 # Max conversation turns to send to the LLM (user+assistant pairs) so the chat "remembers" most of the thread
 _MAX_CHAT_HISTORY_TURNS = 25  # last 25 exchanges (50 messages)
 
+def _build_groq_messages(
+    system_instruction: str,
+    history_messages: list[dict],
+    final_prompt: str,
+) -> list[dict]:
+    """OpenAI-style messages for chat completions (system + history + final user turn)."""
+    messages: list[dict] = [{"role": "system", "content": system_instruction}]
+    for m in history_messages:
+        role = m.get("role", "user")
+        if role == "model":
+            role = "assistant"
+        if role in ("user", "assistant") and m.get("content"):
+            messages.append({"role": role, "content": m["content"]})
+    messages.append({"role": "user", "content": final_prompt})
+    return messages
+
+
 def _call_groq_with_system(
     groq_client: Groq,
     model: str,
@@ -528,14 +570,7 @@ def _call_groq_with_system(
     final_prompt: str,
 ) -> str:
     """Call Groq with system role + full conversation history (user + assistant)."""
-    messages = [{"role": "system", "content": system_instruction}]
-    for m in history_messages:
-        role = m.get("role", "user")
-        if role == "model":
-            role = "assistant"
-        if role in ("user", "assistant") and m.get("content"):
-            messages.append({"role": role, "content": m["content"]})
-    messages.append({"role": "user", "content": final_prompt})
+    messages = _build_groq_messages(system_instruction, history_messages, final_prompt)
     response = groq_client.chat.completions.create(
         model=model,
         messages=messages,
@@ -548,6 +583,35 @@ def _call_groq_with_system(
 # Primary and fallback models (Groq-hosted LLaMA / Mixtral)
 CHAT_MODEL_PRIMARY = "llama-3.3-70b-versatile"
 CHAT_MODEL_FALLBACK = "llama-3.1-8b-instant"
+
+
+def _stream_groq_completion_chunks(groq_client: Groq, messages: list[dict]) -> Iterator[str]:
+    """Stream assistant text deltas from Groq; tries primary model then fallback on quota."""
+    last_error: Optional[Exception] = None
+    for model in (CHAT_MODEL_PRIMARY, CHAT_MODEL_FALLBACK):
+        try:
+            stream = groq_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=True,
+            )
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                if delta and getattr(delta, "content", None):
+                    yield delta.content
+            return
+        except Exception as e:
+            last_error = e
+            if _is_quota_error(e):
+                continue
+            raise
+    if last_error and _is_quota_error(last_error):
+        raise RuntimeError(
+            "RATE_LIMIT: Rate limit reached. Please try again in a few minutes or check https://console.groq.com/docs/rate-limits"
+        )
+    raise last_error or RuntimeError("No reply from model")
 
 
 def _identity_reply(message: str) -> Optional[str]:
@@ -695,18 +759,14 @@ _SYSTEM_INSTRUCTION_API_KEY = (
 )
 
 
-def _docmind_reply_from_rag(
+def _docmind_system_final_prompt(
     chunks: list,
     message: str,
-    history_messages: list[dict],
     rag_user_contents: list[str],
     *,
     api_key_compact: bool = False,
-) -> dict:
-    """Build RAG context from chunks and return {\"reply\": str}. Uses global Groq client."""
-    if not client:
-        return {"reply": "GROQ_API_KEY not found in .env"}
-
+) -> tuple[str, str]:
+    """Embedding + chunk scoring; returns (system_instruction, final_user_prompt) for Groq."""
     rag_query_parts = rag_user_contents[-10:] if rag_user_contents else [(message or "").strip()]
     rag_query = " ".join(str(p) for p in rag_query_parts if p).strip() or (message or "").strip()
 
@@ -739,6 +799,24 @@ User: {message}"""
         if context.strip()
         else message
     )
+    return system_instruction, final_prompt
+
+
+def _docmind_reply_from_rag(
+    chunks: list,
+    message: str,
+    history_messages: list[dict],
+    rag_user_contents: list[str],
+    *,
+    api_key_compact: bool = False,
+) -> dict:
+    """Build RAG context from chunks and return {\"reply\": str}. Uses global Groq client."""
+    if not client:
+        return {"reply": "GROQ_API_KEY not found in .env"}
+
+    system_instruction, final_prompt = _docmind_system_final_prompt(
+        chunks, message, rag_user_contents, api_key_compact=api_key_compact
+    )
 
     reply = None
     last_error = None
@@ -759,33 +837,39 @@ User: {message}"""
     return {"reply": reply}
 
 
-def _chat_sync(req: ChatRequest):
-    """Sync chat logic so we can run it in a thread and not block the event loop."""
-    try:
-        email = req.email or "guest"
-        mode = (req.mode or "personal").strip().lower()
-        user = db_ops.get_user_by_email(email)
-        if not user:
-            display_id = db_ops.get_next_display_id(req.mode or "personal")
-            company = None
-            if mode == "company":
-                domain = _extract_domain(email)
-                if domain:
-                    company = _get_or_create_company(domain)
-            company_id = company["id"] if company else None
-            user = db_ops.create_user(email, display_id, "company" if company else "personal", company_id)
-        elif mode == "company" and user.get("company_id") is None:
+def _resolve_user_and_chat_for_request(req: ChatRequest) -> tuple[dict, dict]:
+    """Create or load user and chat for a website chat request (same rules as /chat)."""
+    email = req.email or "guest"
+    mode = (req.mode or "personal").strip().lower()
+    user = db_ops.get_user_by_email(email)
+    if not user:
+        display_id = db_ops.get_next_display_id(req.mode or "personal")
+        company = None
+        if mode == "company":
             domain = _extract_domain(email)
             if domain:
                 company = _get_or_create_company(domain)
-                if company:
-                    get_supabase().table("users").update({"user_type": "company", "company_id": company["id"]}).eq("id", user["id"]).execute()
-                    user = db_ops.get_user_by_email(email)
+        company_id = company["id"] if company else None
+        user = db_ops.create_user(email, display_id, "company" if company else "personal", company_id)
+    elif mode == "company" and user.get("company_id") is None:
+        domain = _extract_domain(email)
+        if domain:
+            company = _get_or_create_company(domain)
+            if company:
+                get_supabase().table("users").update({"user_type": "company", "company_id": company["id"]}).eq("id", user["id"]).execute()
+                user = db_ops.get_user_by_email(email)
 
-        chat_name = req.chat or "default"
-        chat = db_ops.get_chat_by_user_and_name(user["id"], chat_name)
-        if not chat:
-            chat = db_ops.create_chat(user["id"], chat_name, user.get("display_id") or "")
+    chat_name = req.chat or "default"
+    chat = db_ops.get_chat_by_user_and_name(user["id"], chat_name)
+    if not chat:
+        chat = db_ops.create_chat(user["id"], chat_name, user.get("display_id") or "")
+    return user, chat
+
+
+def _chat_sync(req: ChatRequest):
+    """Sync chat logic so we can run it in a thread and not block the event loop."""
+    try:
+        user, chat = _resolve_user_and_chat_for_request(req)
 
         db_ops.add_message(chat["id"], "user", req.message, user.get("display_id"))
 
@@ -818,6 +902,110 @@ def _chat_sync(req: ChatRequest):
             return {"reply": "Database not set up. In Supabase Dashboard → SQL Editor, run the SQL from Backend/supabase_schema.sql to create the required tables (users, chats, messages, etc.)."}
         return {"reply": f"Error: {err_str}"}
 
+
+def _chat_stream_generator(req: ChatRequest) -> Iterator[bytes]:
+    """SSE: events {\"t\":\"d\",\"c\":chunk}, then {\"t\":\"done\"}, or {\"t\":\"e\",\"m\":...}."""
+    try:
+        user, chat = _resolve_user_and_chat_for_request(req)
+        db_ops.add_message(chat["id"], "user", req.message, user.get("display_id"))
+
+        identity = _identity_reply(req.message)
+        if identity is not None:
+            db_ops.add_message(chat["id"], "model", identity, user.get("display_id"))
+            yield _format_sse({"t": "d", "c": identity})
+            yield _format_sse({"t": "done"})
+            return
+
+        history = db_ops.get_messages_for_chat(chat["id"])
+        history_excluding_current = history[:-1] if len(history) > 1 else []
+        history_tail = history_excluding_current[-(_MAX_CHAT_HISTORY_TURNS * 2) :]
+        history_messages = [{"role": m.get("role", "user"), "content": m.get("content") or ""} for m in history_tail]
+        history_user_contents = [m.get("content") for m in history if m.get("role") == "user"]
+
+        if user.get("company_id") is not None:
+            chunks = db_ops.get_document_chunks_company(user["company_id"])
+        else:
+            chunks = db_ops.get_document_chunks_personal(user["id"], chat["id"])
+
+        rag_users = _rag_user_contents_for_query(history_messages, req.message, history_user_contents)
+        system_instruction, final_prompt = _docmind_system_final_prompt(
+            chunks, req.message, rag_users, api_key_compact=False
+        )
+        messages = _build_groq_messages(system_instruction, history_messages, final_prompt)
+        full: list[str] = []
+        try:
+            for piece in _stream_groq_completion_chunks(client, messages):
+                full.append(piece)
+                yield _format_sse({"t": "d", "c": piece})
+        except Exception:
+            partial = "".join(full).strip()
+            if partial:
+                db_ops.add_message(chat["id"], "model", partial, user.get("display_id"))
+            raise
+        text = "".join(full) or "No reply"
+        db_ops.add_message(chat["id"], "model", text, user.get("display_id"))
+        yield _format_sse({"t": "done"})
+    except Exception as e:
+        if _is_quota_error(e):
+            em = "Groq rate limit exceeded. Please try again in a few minutes or check https://console.groq.com/docs/rate-limits"
+        else:
+            err_str = str(e)
+            if err_str.startswith("RATE_LIMIT:"):
+                em = err_str.split("RATE_LIMIT:", 1)[-1].strip()
+            elif "PGRST205" in err_str or "could not find the table" in err_str.lower() or "schema cache" in err_str.lower():
+                em = "Database not set up. In Supabase Dashboard → SQL Editor, run the SQL from Backend/supabase_schema.sql to create the required tables (users, chats, messages, etc.)."
+            else:
+                em = f"Error: {err_str}"
+        yield _format_sse({"t": "e", "m": em})
+
+
+def _external_api_stream_generator(raw_key: str, body: ExternalChatRequest) -> Iterator[bytes]:
+    """SSE for Bearer API; same event shape as /chat/stream (no DB persistence)."""
+    try:
+        _u, chunks, msg, history_messages = _external_api_validate_and_context(raw_key, body)
+    except UnauthorizedApiKeyError:
+        yield _format_sse({"t": "e", "m": "Invalid or revoked API key", "code": "unauthorized"})
+        return
+    except BadExternalChatRequestError as e:
+        yield _format_sse({"t": "e", "m": e.reply, "code": "bad_request"})
+        return
+    except Exception as e:
+        err_str = str(e)
+        if is_missing_user_api_keys_table_error(err_str):
+            yield _format_sse({"t": "e", "m": detail_table_missing_help()})
+        else:
+            yield _format_sse({"t": "e", "m": f"Error: {err_str}"})
+        return
+
+    identity = _identity_reply(msg)
+    if identity is not None:
+        yield _format_sse({"t": "d", "c": identity})
+        yield _format_sse({"t": "done"})
+        return
+
+    rag_users = _rag_user_contents_for_query(history_messages, msg, None)
+    system_instruction, final_prompt = _docmind_system_final_prompt(
+        chunks, msg, rag_users, api_key_compact=True
+    )
+    messages = _build_groq_messages(system_instruction, history_messages, final_prompt)
+    try:
+        for piece in _stream_groq_completion_chunks(client, messages):
+            yield _format_sse({"t": "d", "c": piece})
+        yield _format_sse({"t": "done"})
+    except Exception as e:
+        if _is_quota_error(e):
+            em = "Groq rate limit exceeded. Please try again in a few minutes or check https://console.groq.com/docs/rate-limits"
+        else:
+            err_str = str(e)
+            if err_str.startswith("RATE_LIMIT:"):
+                em = err_str.split("RATE_LIMIT:", 1)[-1].strip()
+            elif is_missing_user_api_keys_table_error(err_str):
+                em = detail_table_missing_help()
+            else:
+                em = f"Error: {err_str}"
+        yield _format_sse({"t": "e", "m": em})
+
+
 @app.post("/chat")
 async def chat(req: ChatRequest):
     if not GROQ_API_KEY or not client:
@@ -836,11 +1024,43 @@ async def chat(req: ChatRequest):
     return await asyncio.to_thread(_chat_sync, req)
 
 
+@app.post("/chat/stream")
+def chat_stream_endpoint(req: ChatRequest):
+    """Server-Sent Events stream: `data: {\"t\":\"d\",\"c\":\"...\"}` per chunk, then `{\"t\":\"done\"}`."""
+    if not GROQ_API_KEY or not client:
+
+        def no_key():
+            yield _format_sse({"t": "e", "m": "GROQ_API_KEY not found in .env"})
+
+        return StreamingResponse(no_key(), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+    email = req.email or "guest"
+    user = db_ops.get_user_by_email(email)
+    if user:
+        chat_name = req.chat or "default"
+        chat = db_ops.get_chat_by_user_and_name(user["id"], chat_name)
+        if chat:
+            _schedule_message_cache_invalidate(user["id"], chat["id"])
+
+    return StreamingResponse(_chat_stream_generator(req), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
 class UnauthorizedApiKeyError(Exception):
     """Invalid or revoked API key (used by /api/v1/chat)."""
 
 
-def _external_api_chat_sync(raw_key: str, body: ExternalChatRequest) -> dict:
+class BadExternalChatRequestError(Exception):
+    """Invalid body for external API (maps to JSON error response)."""
+
+    def __init__(self, reply: str):
+        super().__init__(reply)
+        self.reply = reply
+
+
+def _external_api_validate_and_context(
+    raw_key: str, body: ExternalChatRequest
+) -> tuple[dict, list, str, list[dict]]:
+    """Resolve API key and return (user, chunks, message, history_messages)."""
     try_ensure_user_api_keys_table()
     row = _resolve_user_api_key_row(raw_key)
     if not row:
@@ -866,11 +1086,22 @@ def _external_api_chat_sync(raw_key: str, body: ExternalChatRequest) -> dict:
 
     msg = (body.message or "").strip()
     if not msg:
-        return {"reply": "message is required", "error": "bad_request"}
+        raise BadExternalChatRequestError("message is required")
     if len(msg) > 32000:
-        return {"reply": "message too long", "error": "bad_request"}
+        raise BadExternalChatRequestError("message too long")
 
     history_messages = _normalize_api_history(body.history)
+    return user, chunks, msg, history_messages
+
+
+def _external_api_chat_sync(raw_key: str, body: ExternalChatRequest) -> dict:
+    try:
+        _u, chunks, msg, history_messages = _external_api_validate_and_context(raw_key, body)
+    except UnauthorizedApiKeyError:
+        raise
+    except BadExternalChatRequestError as e:
+        return {"reply": e.reply, "error": "bad_request"}
+
     identity = _identity_reply(msg)
     if identity is not None:
         return {"reply": identity}
@@ -997,6 +1228,25 @@ async def external_api_chat(request: Request, body: ExternalChatRequest):
         if is_missing_user_api_keys_table_error(err_str):
             return {"reply": detail_table_missing_help()}
         return {"reply": f"Error: {err_str}"}
+
+
+@app.post("/api/v1/chat/stream")
+def external_api_chat_stream(request: Request, body: ExternalChatRequest):
+    """
+    Same as POST /api/v1/chat but streams SSE: delta events `{"t":"d","c":"..."}`, then `{"t":"done"}`.
+    Errors as `{"t":"e","m":"...","code":...}` (HTTP 200 with event body) except missing Bearer → 401.
+    """
+    raw = _parse_bearer_api_key(request.headers.get("Authorization"))
+    if not raw:
+        raise HTTPException(status_code=401, detail="Missing Authorization: Bearer <api_key>")
+    if not GROQ_API_KEY or not client:
+
+        def no_key():
+            yield _format_sse({"t": "e", "m": "GROQ_API_KEY not found in .env"})
+
+        return StreamingResponse(no_key(), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+    return StreamingResponse(_external_api_stream_generator(raw, body), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 def _sanitize_filename(name: str) -> str:
