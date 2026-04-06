@@ -492,6 +492,11 @@ select,
     border-radius: 50%;
 }
 
+/* Shown only on mobile; desktop keeps two lines + dot (toggle hidden ≥769px). */
+.sidebar-toggle-line--third {
+    display: none;
+}
+
 .sidebar-toggle:hover .sidebar-toggle-line {
     background: #475569;
 }
@@ -625,8 +630,16 @@ select,
     }
 
     .sidebar-toggle-dot {
-        width: 9px;
-        height: 9px;
+        display: none !important;
+    }
+
+    .sidebar-toggle-line--third {
+        display: block !important;
+        position: static;
+        transform: none;
+        width: 24px;
+        height: 3px;
+        border-radius: 2px;
     }
 
     .sidebar-mobile-top {
@@ -697,7 +710,7 @@ select,
     }
 
     .chat-container .chat-header {
-        padding: max(6px, env(safe-area-inset-top)) 8px 6px;
+        padding: max(8px, env(safe-area-inset-top)) 10px 8px;
         gap: 8px;
         min-width: 0;
         align-items: center;
@@ -705,31 +718,41 @@ select,
         justify-content: flex-start;
     }
 
+    /* Mobile header: menu (left) + doc / API actions (right); no chat title */
     .chat-container .chat-header .sidebar-toggle {
         align-self: center;
         flex-shrink: 0;
+        background: transparent;
+        border-radius: 8px;
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
+        margin: 0 2px 0 0;
+        padding: 0;
+    }
+
+    .chat-container .chat-header .sidebar-toggle .sidebar-toggle-icon {
+        width: 18px;
+        height: 14px;
+        gap: 3px;
+    }
+
+    .chat-container .chat-header .sidebar-toggle .sidebar-toggle-line,
+    .chat-container .chat-header .sidebar-toggle .sidebar-toggle-line--third {
+        width: 18px;
+        height: 2px;
+        border-radius: 1px;
     }
 
     .chat-container .chat-header h3 {
-        font-size: 0.9375rem;
-        font-weight: 600;
-        min-width: 0;
-        flex: 1 1 auto;
-        align-self: center;
-        overflow: hidden;
-        white-space: normal;
-        word-break: break-word;
-        line-height: 1.3;
-        margin: 0;
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
+        display: none !important;
     }
 
-    /* Chat header: compact labels, vertically centered, no overlap */
     .chat-container .chat-header .chat-docs-panel {
         align-self: center;
+        margin-left: auto;
+        max-width: calc(100% - 48px);
     }
 
     .chat-docs-panel {
@@ -783,51 +806,49 @@ select,
         align-items: center;
     }
 
-    .chat-api-key-label-full,
     .chat-docs-upload-label-full {
         display: none !important;
     }
 
-    .chat-docs-upload-label-short {
-        display: none !important;
-    }
-
-    .chat-api-key-label-short {
+    .chat-docs-upload-label-mobile-bar {
         display: inline !important;
     }
 
-    .chat-docs-upload-icon {
-        display: inline-flex !important;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.35rem;
-        font-weight: 400;
-        line-height: 1;
+    .chat-api-key-label-short {
+        display: none !important;
     }
 
-    .chat-api-key-trigger {
-        font-size: 9px;
-        padding: 5px 7px;
-        white-space: nowrap;
-        line-height: 1.2;
+    .chat-api-key-label-full {
+        display: inline !important;
+    }
+
+    .chat-header-btn-icon {
+        display: block;
         flex-shrink: 0;
     }
 
-    /* Mobile: compact + control for chat PDF upload (icon only) */
-    .chat-docs-upload-trigger {
-        font-size: 0;
-        padding: 0;
-        width: 36px;
-        height: 36px;
-        min-width: 36px;
-        min-height: 36px;
+    .chat-docs-upload-trigger,
+    .chat-api-key-trigger {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        border-radius: 50%;
+        gap: 6px;
+        padding: 8px 10px;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.2;
         white-space: nowrap;
-        line-height: 1;
-        flex-shrink: 0;
+        flex-shrink: 1;
+        min-width: 0;
+        border-radius: 10px;
+    }
+
+    .chat-header-btn-icon--doc {
+        color: #166534;
+    }
+
+    .chat-header-btn-icon--key {
+        color: #1e40af;
     }
 
     .chat-docs-panel .chat-docs-list li {
@@ -1172,12 +1193,16 @@ select,
     border-color: #93c5fd;
 }
 
-.chat-api-key-label-short,
-.chat-docs-upload-label-short {
+.chat-api-key-label-short {
     display: none;
 }
 
-.chat-docs-upload-icon {
+/* Icons + “Document upload” label are mobile header only; web keeps text-only buttons. */
+.chat-header-btn-icon {
+    display: none;
+}
+
+.chat-docs-upload-label-mobile-bar {
     display: none;
 }
 
