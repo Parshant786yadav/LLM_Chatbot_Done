@@ -676,11 +676,32 @@ def _rag_user_contents_for_query(
     return users[-10:] if users else ([msg] if msg else [])
 
 
+_SYSTEM_INSTRUCTION_WEB = (
+    "You are DocuMind, a friendly, helpful AI assistant. Talk naturally like a human—warm, conversational, and engaging. "
+    "If the user asks your name or what to call you, say your name is DocuMind. "
+    "If they ask who made you, who created you, or who built you, say Parshant. "
+    "For greetings (e.g. hello, hi, how are you), small talk, or general questions, respond in a natural way. "
+    "When the user has provided 'Relevant context from documents' below, use that context to answer questions about the documents when relevant; "
+    "otherwise answer from your knowledge or chat normally. Never say you don't know for simple greetings or chitchat."
+)
+
+# Shorter replies for Bearer API (/api/v1/chat) only; website /chat keeps _SYSTEM_INSTRUCTION_WEB.
+_SYSTEM_INSTRUCTION_API_KEY = (
+    "You are DocuMind answering through an API (embedded chatbot). "
+    "Keep every reply to at most 1–2 short lines (about 1–3 sentences total). "
+    "Answer only what the user asked: no long introductions, no extra background, no bullet lists unless they explicitly want a list. "
+    "If 'Relevant context from documents' is present, use it for factual answers about those documents; otherwise reply briefly. "
+    "Your name is DocuMind; creator is Parshant. For simple greetings, one brief friendly line."
+)
+
+
 def _docmind_reply_from_rag(
     chunks: list,
     message: str,
     history_messages: list[dict],
     rag_user_contents: list[str],
+    *,
+    api_key_compact: bool = False,
 ) -> dict:
     """Build RAG context from chunks and return {\"reply\": str}. Uses global Groq client."""
     if not client:
@@ -706,14 +727,7 @@ def _docmind_reply_from_rag(
         print(f"[CHAT] Context chunks used: {len(top_chunks)}", flush=True)
         context = "\n\n".join(top_chunks) if top_chunks else ""
 
-    system_instruction = (
-        "You are DocuMind, a friendly, helpful AI assistant. Talk naturally like a human—warm, conversational, and engaging. "
-        "If the user asks your name or what to call you, say your name is DocuMind. "
-        "If they ask who made you, who created you, or who built you, say Parshant. "
-        "For greetings (e.g. hello, hi, how are you), small talk, or general questions, respond in a natural way. "
-        "When the user has provided 'Relevant context from documents' below, use that context to answer questions about the documents when relevant; "
-        "otherwise answer from your knowledge or chat normally. Never say you don't know for simple greetings or chitchat."
-    )
+    system_instruction = _SYSTEM_INSTRUCTION_API_KEY if api_key_compact else _SYSTEM_INSTRUCTION_WEB
     final_prompt = (
         f"""Relevant context from the user's uploaded documents:
 
@@ -862,7 +876,7 @@ def _external_api_chat_sync(raw_key: str, body: ExternalChatRequest) -> dict:
         return {"reply": identity}
 
     rag_users = _rag_user_contents_for_query(history_messages, msg, None)
-    result = _docmind_reply_from_rag(chunks, msg, history_messages, rag_users)
+    result = _docmind_reply_from_rag(chunks, msg, history_messages, rag_users, api_key_compact=True)
     return {"reply": result["reply"]}
 
 
