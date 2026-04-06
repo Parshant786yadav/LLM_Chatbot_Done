@@ -660,6 +660,7 @@ history.replaceState({}, document.title, window.location.pathname || "/");
     var car = document.getElementById("chatApiKeyReveal");
     if (car) { car.style.display = "none"; car.textContent = ""; }
     closeChatApiKeyPopover();
+    closeChatDocsUploadPopover();
 
     document.getElementById("chatList").innerHTML = "";
     document.getElementById("chatArea").innerHTML = "";
@@ -978,6 +979,7 @@ async function renameChatOnServer(oldName, newName) {
             }
             renderChats();
             closeChatApiKeyPopover();
+            closeChatDocsUploadPopover();
         } else {
             const msg = Array.isArray(data.detail) ? data.detail.map(function (x) { return x.msg || x; }).join(" ") : (data.detail || "Rename failed");
             toast(msg, "error");
@@ -992,6 +994,7 @@ async function selectChat(chatName) {
     closeSidebar();
     closeDatabaseView();
     closeChatApiKeyPopover();
+    closeChatDocsUploadPopover();
     currentChat = chatName;
     try { localStorage.setItem("currentChat", chatName); } catch(e) {}
     document.getElementById("chatTitle").innerText = chatName;
@@ -1051,7 +1054,10 @@ function updateApiKeysSectionVisibility() {
     var personal = loginMode === "personal" && !!userEmail;
     if (g) g.style.display = personal ? "block" : "none";
     if (tbar) tbar.style.display = personal && currentChat ? "block" : "none";
-    if (!personal || !currentChat) closeChatApiKeyPopover();
+    if (!personal || !currentChat) {
+        closeChatApiKeyPopover();
+        closeChatDocsUploadPopover();
+    }
 }
 
 function closeChatApiKeyPopover() {
@@ -1081,12 +1087,48 @@ function toggleChatApiKeyPopover(e) {
         closeChatApiKeyPopover();
         return;
     }
-    closeChatDocsUploadDropdown();
+    closeChatDocsUploadPopover();
     pop.classList.add("chat-api-key-popover--open");
     pop.setAttribute("aria-hidden", "false");
     btn.setAttribute("aria-expanded", "true");
     setTimeout(function () {
         document.addEventListener("click", closeChatApiKeyPopoverOnOutside);
+    }, 0);
+}
+
+function closeChatDocsUploadPopover() {
+    var pop = document.getElementById("chatDocsUploadPopover");
+    var btn = document.getElementById("chatDocsUploadPopoverBtn");
+    if (pop) {
+        pop.classList.remove("chat-docs-upload-popover--open");
+        pop.setAttribute("aria-hidden", "true");
+    }
+    if (btn) btn.setAttribute("aria-expanded", "false");
+    document.removeEventListener("click", closeChatDocsUploadPopoverOnOutside);
+}
+
+function closeChatDocsUploadPopoverOnOutside(e) {
+    var wrap = document.querySelector(".chat-docs-upload-toolbar-inner");
+    if (wrap && !wrap.contains(e.target)) {
+        closeChatDocsUploadPopover();
+    }
+}
+
+function toggleChatDocsUploadPopover(e) {
+    if (e) e.stopPropagation();
+    var pop = document.getElementById("chatDocsUploadPopover");
+    var btn = document.getElementById("chatDocsUploadPopoverBtn");
+    if (!pop || !btn) return;
+    if (pop.classList.contains("chat-docs-upload-popover--open")) {
+        closeChatDocsUploadPopover();
+        return;
+    }
+    closeChatApiKeyPopover();
+    pop.classList.add("chat-docs-upload-popover--open");
+    pop.setAttribute("aria-hidden", "false");
+    btn.setAttribute("aria-expanded", "true");
+    setTimeout(function () {
+        document.addEventListener("click", closeChatDocsUploadPopoverOnOutside);
     }, 0);
 }
 
@@ -1324,6 +1366,7 @@ function toggleGlobalDocsList() {
 
 function toggleChatDocsList() {
     var list = document.getElementById("chatDocs");
+    if (!list) return;
     list.classList.toggle("doc-list-collapsed");
 }
 
@@ -1463,80 +1506,18 @@ async function toggleCompanyShowCountToEmployees() {
     }
 }
 
-/* Move #chatDocs into the + dropdown on mobile so one anchored menu (avoids stray thin bar). */
-function layoutChatDocsPanelForViewport() {
-    var main = document.querySelector(".chat-docs-main");
-    var ul = document.getElementById("chatDocs");
-    var dropdown = document.getElementById("chatDocsMobileDropdown");
-    var mobileWrap = document.getElementById("chatDocsMobileWrap");
-    if (!main || !ul || !dropdown || !mobileWrap) return;
-    if (window.innerWidth <= 768) {
-        dropdown.appendChild(ul);
-    } else {
-        main.insertBefore(ul, mobileWrap);
-    }
-}
-
-function triggerChatDocUploadFromMobile() {
-    var input = document.getElementById("chatUpload");
-    if (input) input.click();
-    closeChatDocsUploadDropdown();
-}
-
-function toggleChatDocsUploadDropdown() {
-    var dropdown = document.getElementById("chatDocsMobileDropdown");
-    var plus = document.getElementById("chatDocsMobilePlus");
-    if (!dropdown || !plus) return;
-    closeChatApiKeyPopover();
-    var isOpen = dropdown.classList.toggle("open");
-    plus.setAttribute("aria-expanded", isOpen);
-    var list = document.getElementById("chatDocs");
-    if (list && window.innerWidth <= 768) {
-        if (isOpen) {
-            list.classList.remove("doc-list-collapsed");
-        } else {
-            list.classList.add("doc-list-collapsed");
-        }
-    }
-    if (isOpen) {
-        setTimeout(function () {
-            document.addEventListener("click", closeChatDocsUploadDropdownOnClickOutside);
-        }, 0);
-    } else {
-        document.removeEventListener("click", closeChatDocsUploadDropdownOnClickOutside);
-    }
-}
-
-function closeChatDocsUploadDropdown() {
-    var dropdown = document.getElementById("chatDocsMobileDropdown");
-    var plus = document.getElementById("chatDocsMobilePlus");
-    if (dropdown) dropdown.classList.remove("open");
-    if (plus) plus.setAttribute("aria-expanded", "false");
-    var list = document.getElementById("chatDocs");
-    if (list && window.innerWidth <= 768) {
-        list.classList.add("doc-list-collapsed");
-    }
-    document.removeEventListener("click", closeChatDocsUploadDropdownOnClickOutside);
-}
-
-function closeChatDocsUploadDropdownOnClickOutside(e) {
-    var panel = document.getElementById("chatDocsPanel");
-    if (panel && !panel.contains(e.target)) {
-        closeChatDocsUploadDropdown();
-    }
-}
+/** Reserved for resize hooks; chat docs list lives in the upload popover (no DOM reparenting). */
+function layoutChatDocsPanelForViewport() {}
 
 function renderChatDocs() {
     if (loginMode !== "personal") return;
     var list = document.getElementById("chatDocs");
     var toggleBtn = document.getElementById("chatDocsToggle");
-    var mobileCount = document.getElementById("chatDocsMobileCount");
     if (!toggleBtn || !list) return;
     var docs = currentChat ? chatDocuments[currentChat] || [] : [];
     var n = docs.length;
-    toggleBtn.textContent = (window.innerWidth <= 768) ? (n + " docs") : ("Documents uploaded " + n);
+    toggleBtn.textContent = "Documents uploaded " + n;
     toggleBtn.setAttribute("data-count", n);
-    if (mobileCount) mobileCount.textContent = n + " docs";
     list.innerHTML = "";
     list.classList.add("doc-list-collapsed");
     if (!currentChat) return;
@@ -1565,10 +1546,6 @@ function renderChatDocs() {
         li.appendChild(removeBtn);
         list.appendChild(li);
     });
-    var dd = document.getElementById("chatDocsMobileDropdown");
-    if (window.innerWidth <= 768 && dd && dd.classList.contains("open")) {
-        list.classList.remove("doc-list-collapsed");
-    }
 }
 
 async function removeChatDoc(docId) {
@@ -2145,7 +2122,6 @@ function googleLogin() {
     }
     function updateChatDocsToggleText() {
         var toggleBtn = document.getElementById("chatDocsToggle");
-        var mobileCount = document.getElementById("chatDocsMobileCount");
         if (toggleBtn) {
             var n = toggleBtn.getAttribute("data-count");
             if (n === null) {
@@ -2153,8 +2129,7 @@ function googleLogin() {
                 n = m ? m[1] : "0";
                 toggleBtn.setAttribute("data-count", n);
             }
-            toggleBtn.textContent = (window.innerWidth <= 768) ? (n + " docs") : ("Documents uploaded " + n);
-            if (mobileCount) mobileCount.textContent = n + " docs";
+            toggleBtn.textContent = "Documents uploaded " + n;
         }
         updateMessageInputPlaceholder();
         layoutChatDocsPanelForViewport();

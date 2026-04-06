@@ -118,7 +118,7 @@
                         <div class="chat-docs-panel-inner">
                             <div id="chatApiKeyToolbar" class="chat-api-key-toolbar" style="display: none;">
                                 <div class="chat-api-key-toolbar-inner">
-                                    <button type="button" class="chat-api-key-trigger" id="chatApiKeyPopoverBtn" onclick="toggleChatApiKeyPopover(event)" aria-expanded="false" aria-haspopup="true" aria-controls="chatApiKeyPopover">Create API key</button>
+                                    <button type="button" class="chat-api-key-trigger" id="chatApiKeyPopoverBtn" onclick="toggleChatApiKeyPopover(event)" aria-expanded="false" aria-haspopup="true" aria-controls="chatApiKeyPopover" title="Create API key" aria-label="Create API key"><span class="chat-api-key-label-full">Create API key</span><span class="chat-api-key-label-short" aria-hidden="true">API key</span></button>
                                     <div id="chatApiKeyPopover" class="chat-api-key-popover" role="dialog" aria-labelledby="chatApiKeyPopoverHeading" aria-hidden="true">
                                         <p id="chatApiKeyPopoverHeading" class="api-keys-title">API key (this chat only)</p>
                                         <p class="api-keys-desc">Answers only use PDFs uploaded in this chat.</p>
@@ -132,15 +132,13 @@
                                 </div>
                             </div>
                             <div class="chat-docs-main">
-                                <h4 class="chat-docs-panel-title">Chat Documents</h4>
-                                <input type="file" id="chatUpload" accept=".pdf,application/pdf" onchange="uploadChatDoc()" class="chat-docs-upload">
-                                <button type="button" class="documents-toggle chat-docs-toggle" id="chatDocsToggle" onclick="toggleChatDocsList()">Documents uploaded 0</button>
-                                <ul id="chatDocs" class="chat-docs-list doc-list doc-list-collapsed"></ul>
-                                <div class="chat-docs-mobile" id="chatDocsMobileWrap" aria-label="Chat documents">
-                                    <button type="button" class="chat-docs-mobile-plus" id="chatDocsMobilePlus" onclick="toggleChatDocsUploadDropdown()" aria-expanded="false" aria-haspopup="true" title="Documents">+</button>
-                                    <span class="chat-docs-mobile-count" id="chatDocsMobileCount">0 docs</span>
-                                    <div class="chat-docs-mobile-dropdown" id="chatDocsMobileDropdown">
-                                        <button type="button" class="chat-docs-mobile-upload-btn" id="chatDocsMobileUploadBtn" onclick="triggerChatDocUploadFromMobile()">Upload file</button>
+                                <div class="chat-docs-upload-toolbar-inner">
+                                    <button type="button" class="chat-docs-upload-trigger" id="chatDocsUploadPopoverBtn" onclick="toggleChatDocsUploadPopover(event)" aria-expanded="false" aria-haspopup="true" aria-controls="chatDocsUploadPopover" title="Upload document" aria-label="Upload document"><span class="chat-docs-upload-label-full">Upload document</span><span class="chat-docs-upload-label-short" aria-hidden="true">Upload</span></button>
+                                    <div id="chatDocsUploadPopover" class="chat-docs-upload-popover" role="dialog" aria-labelledby="chatDocsUploadPopoverHeading" aria-hidden="true">
+                                        <h4 class="chat-docs-panel-title" id="chatDocsUploadPopoverHeading">Chat Documents</h4>
+                                        <input type="file" id="chatUpload" accept=".pdf,application/pdf" onchange="uploadChatDoc()" class="chat-docs-upload">
+                                        <button type="button" class="documents-toggle chat-docs-toggle" id="chatDocsToggle" onclick="toggleChatDocsList()">Documents uploaded 0</button>
+                                        <ul id="chatDocs" class="chat-docs-list doc-list doc-list-collapsed"></ul>
                                     </div>
                                 </div>
                             </div>

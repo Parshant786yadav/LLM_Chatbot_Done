@@ -727,12 +727,16 @@ select,
         line-clamp: 2;
     }
 
-    /* Chat Documents: hide wide desktop controls; compact + menu (see .chat-docs-mobile) */
+    /* Chat header: compact labels, vertically centered, no overlap */
+    .chat-container .chat-header .chat-docs-panel {
+        align-self: center;
+    }
+
     .chat-docs-panel {
         position: relative;
         width: auto !important;
         min-width: 0 !important;
-        max-width: min(200px, 46vw);
+        max-width: none;
         flex-shrink: 0;
         flex-grow: 0;
         padding: 0 !important;
@@ -744,200 +748,70 @@ select,
     .chat-docs-panel-inner {
         display: flex;
         flex-direction: row;
-        align-items: flex-start;
-        gap: 6px;
-        width: 100%;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        width: auto;
+    }
+
+    .chat-api-key-toolbar {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
     }
 
     .chat-docs-main {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
+        justify-content: flex-end;
         align-items: center;
-        flex: 1;
+        flex: 0 0 auto;
         min-width: 0;
+    }
+
+    .chat-docs-upload-toolbar-inner {
+        position: relative;
+        z-index: 64;
+        display: flex;
+        align-items: center;
     }
 
     .chat-api-key-toolbar-inner {
         position: relative;
         z-index: 65;
+        display: flex;
+        align-items: center;
+    }
+
+    .chat-api-key-label-full,
+    .chat-docs-upload-label-full {
+        display: none !important;
+    }
+
+    .chat-api-key-label-short,
+    .chat-docs-upload-label-short {
+        display: inline !important;
     }
 
     .chat-api-key-trigger {
-        font-size: 10px;
-        padding: 6px 8px;
+        font-size: 9px;
+        padding: 5px 7px;
         white-space: nowrap;
-        max-width: 72px;
         line-height: 1.2;
+        flex-shrink: 0;
     }
 
-    .chat-docs-panel-title,
-    .chat-docs-upload,
-    .chat-docs-toggle {
-        display: none !important;
-    }
-
-    /* Desktop list stays in panel; on mobile JS moves #chatDocs into .chat-docs-mobile-dropdown */
-    .chat-docs-main > #chatDocs {
-        display: none;
-    }
-
-    .chat-docs-mobile-dropdown #chatDocs {
-        display: block;
-        position: relative;
-        top: auto;
-        right: auto;
-        left: auto;
-        width: 100%;
-        max-width: none;
-        max-height: min(200px, 38vh);
-        margin: 0;
-        padding: 4px 0 6px;
-        font-size: 12px;
-        border: none;
-        border-top: 1px solid #e2e8f0;
-        border-radius: 0 0 10px 10px;
-        background: #fff;
-        box-shadow: none;
-        z-index: 1;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        box-sizing: border-box;
-    }
-
-    .chat-docs-mobile-dropdown #chatDocs:not(:has(li)) {
-        display: none !important;
-        border-top: none;
-        padding: 0;
-        max-height: 0;
-    }
-
-    .chat-docs-mobile-dropdown #chatDocs.doc-list-collapsed:not(:has(li)) {
-        max-height: 0;
-        padding: 0;
-        border: none;
-        overflow: hidden;
-    }
-
-    .chat-docs-mobile-dropdown #chatDocs.doc-list-collapsed:has(li) {
-        max-height: min(200px, 38vh) !important;
-        overflow-y: auto !important;
+    .chat-docs-upload-trigger {
+        font-size: 9px;
+        padding: 5px 8px;
+        white-space: nowrap;
+        line-height: 1.2;
+        flex-shrink: 0;
     }
 
     .chat-docs-panel .chat-docs-list li {
         padding: 8px 10px;
         font-size: 12px;
-    }
-
-    .chat-docs-mobile {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        position: relative;
-        flex-shrink: 0;
-        width: 100%;
-        max-width: 52px;
-    }
-
-    .chat-docs-mobile-plus {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        border: 1px solid #e2e8f0;
-        background: #fff;
-        color: #2563eb;
-        font-size: 1.4rem;
-        font-weight: 300;
-        line-height: 1;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-        transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
-    }
-
-    .chat-docs-mobile-plus:hover {
-        background: #f8fafc;
-        border-color: #2563eb;
-        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.15);
-    }
-
-    .chat-docs-mobile-count {
-        font-size: 10px;
-        color: #64748b;
-        margin-top: 3px;
-        font-weight: 500;
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        text-align: center;
-        line-height: 1.2;
-    }
-
-    .chat-docs-mobile-dropdown {
-        display: block;
-        position: absolute;
-        top: 100%;
-        right: 0;
-        left: auto;
-        margin-top: 6px;
-        min-width: min(220px, calc(100vw - 24px));
-        width: max-content;
-        max-width: calc(100vw - 24px);
-        padding: 0;
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
-        z-index: 60;
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-        transform: translateY(-6px);
-        transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;
-        box-sizing: border-box;
-    }
-
-    .chat-docs-mobile-dropdown.open {
-        opacity: 1;
-        visibility: visible;
-        pointer-events: auto;
-        transform: translateY(0);
-    }
-
-    .chat-docs-mobile-dropdown:not(:has(#chatDocs li)) .chat-docs-mobile-upload-btn {
-        border-radius: 10px;
-    }
-
-    .chat-docs-mobile-dropdown:has(#chatDocs li) .chat-docs-mobile-upload-btn {
-        border-radius: 10px 10px 0 0;
-    }
-
-    .chat-docs-mobile-upload-btn {
-        display: block;
-        width: 100%;
-        padding: 10px 14px;
-        border: none;
-        background: transparent;
-        color: #334155;
-        font-size: 13px;
-        font-weight: 500;
-        text-align: left;
-        cursor: pointer;
-        transition: background 0.15s;
-    }
-
-    .chat-docs-mobile-upload-btn:hover {
-        background: #f1f5f9;
-    }
-}
-
-/* Desktop only: hide compact + menu (mobile uses .chat-docs-mobile inside max-width:768) */
-@media (min-width: 769px) {
-    .chat-docs-mobile {
-        display: none !important;
     }
 }
 
@@ -1193,6 +1067,59 @@ select,
 .chat-docs-main {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: flex-start;
+}
+
+.chat-docs-upload-toolbar-inner {
+    position: relative;
+}
+
+.chat-docs-upload-trigger {
+    display: inline-block;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #166534;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+
+.chat-docs-upload-trigger:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+}
+
+.chat-docs-upload-popover {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    left: auto;
+    min-width: min(280px, calc(100vw - 32px));
+    max-width: min(320px, calc(100vw - 32px));
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+    z-index: 80;
+    box-sizing: border-box;
+}
+
+.chat-docs-upload-popover.chat-docs-upload-popover--open {
+    display: block;
+}
+
+.chat-docs-upload-popover .chat-docs-upload {
+    width: 100%;
+    max-width: 100%;
 }
 
 /* Chat header: API key button (left) + documents (right) */
@@ -1223,6 +1150,16 @@ select,
     border-color: #93c5fd;
 }
 
+.chat-api-key-label-short,
+.chat-docs-upload-label-short {
+    display: none;
+}
+
+.chat-api-key-label-full,
+.chat-docs-upload-label-full {
+    display: inline;
+}
+
 .chat-api-key-popover {
     display: none;
     position: absolute;
@@ -1250,7 +1187,7 @@ select,
 
 @media (min-width: 769px) {
     .chat-docs-panel {
-        width: 300px;
+        width: 340px;
         padding: 12px;
     }
 }
@@ -2719,7 +2656,8 @@ select,
     .chat-menu-dropdown {
         transition: none;
     }
-    .chat-docs-mobile-dropdown {
+    .chat-docs-upload-popover,
+    .chat-api-key-popover {
         transition: none;
     }
     .toast {
