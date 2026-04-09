@@ -227,6 +227,13 @@ def home(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
 
 
+@app.api_route("/how-it-works", methods=["GET", "HEAD"], response_class=HTMLResponse)
+def how_it_works(request: Request):
+    if request.method == "HEAD":
+        return Response(status_code=200)
+    return templates.TemplateResponse(request=request, name="how-it-works.html")
+
+
 @app.on_event("startup")
 async def startup():
     global _app_loop

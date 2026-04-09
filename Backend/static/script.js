@@ -17,6 +17,10 @@ let chatDocuments = {};
 let companyDocuments = [];  // HR company docs (same-domain users access via chat only)
 var API_BASE = (window.location.protocol === "http:" || window.location.protocol === "https:") ? "" : "http://localhost:8000";
 
+/** Bot avatar — bump BOT_AVATAR_REVISION when you replace Backend/static/bot-avatar.png (avoids stale browser cache). */
+var BOT_AVATAR_REVISION = "4";
+var BOT_AVATAR_URL = API_BASE + "/static/bot-avatar.png?v=" + BOT_AVATAR_REVISION;
+
 /* ---------------- LOADERS ---------------- */
 function showChatListLoader() {
     var chatList = document.getElementById("chatList");
@@ -1668,14 +1672,15 @@ function addTypingIndicator() {
     var chatArea = document.getElementById("chatArea");
     if (!chatArea) return;
     var wrapper = document.createElement("div");
-    wrapper.className = "typing-indicator-wrapper message-row";
+    wrapper.className = "typing-indicator-wrapper message-row message-row--assistant";
     wrapper.setAttribute("data-typing", "1");
     wrapper.style.display = "flex";
     wrapper.style.alignItems = "flex-start";
     wrapper.style.marginBottom = "10px";
     var avatar = document.createElement("img");
-    avatar.className = "message-avatar";
-    avatar.src = "https://cdn-icons-png.flaticon.com/512/4712/4712027.png";
+    avatar.className = "message-avatar message-avatar--bot";
+    avatar.src = BOT_AVATAR_URL;
+    avatar.alt = "DocuMind";
     var messageDiv = document.createElement("div");
     messageDiv.className = "message bot typing-indicator";
     messageDiv.innerText = "typing...";
@@ -1694,13 +1699,14 @@ function removeTypingIndicator() {
 function createStreamingBotMessage() {
     var chatArea = document.getElementById("chatArea");
     var wrapper = document.createElement("div");
-    wrapper.className = "message-row";
+    wrapper.className = "message-row message-row--assistant";
     wrapper.style.display = "flex";
     wrapper.style.alignItems = "flex-start";
     wrapper.style.marginBottom = "10px";
     var avatar = document.createElement("img");
-    avatar.className = "message-avatar";
-    avatar.src = "https://cdn-icons-png.flaticon.com/512/4712/4712027.png";
+    avatar.className = "message-avatar message-avatar--bot";
+    avatar.src = BOT_AVATAR_URL;
+    avatar.alt = "DocuMind";
     var messageDiv = document.createElement("div");
     messageDiv.className = "message bot";
     messageDiv.innerText = "";
@@ -1807,25 +1813,19 @@ function addMessage(text, role) {
     wrapper.style.alignItems = "flex-start";
     wrapper.style.marginBottom = "10px";
 
-    const avatar = document.createElement("img");
-    avatar.className = "message-avatar";
-
-    if (role === "user") {
-        const profileImg = document.getElementById("profilePhoto");
-        avatar.src = profileImg ? profileImg.src : "https://api.dicebear.com/7.x/avataaars/svg?seed=guest";
-        wrapper.style.justifyContent = "flex-end";
-    } else {
-        avatar.src = "https://cdn-icons-png.flaticon.com/512/4712/4712027.png";
-    }
-
     const messageDiv = document.createElement("div");
     messageDiv.className = "message " + role;
     messageDiv.innerText = text;
 
     if (role === "user") {
+        wrapper.style.justifyContent = "flex-end";
         wrapper.appendChild(messageDiv);
-        wrapper.appendChild(avatar);
     } else {
+        wrapper.classList.add("message-row--assistant");
+        const avatar = document.createElement("img");
+        avatar.className = "message-avatar message-avatar--bot";
+        avatar.src = BOT_AVATAR_URL;
+        avatar.alt = "DocuMind";
         wrapper.appendChild(avatar);
         wrapper.appendChild(messageDiv);
     }
@@ -2181,20 +2181,63 @@ function googleLogin() {
     history.replaceState({}, document.title, window.location.pathname || "/");
 })();
 
-/* Mobile: auto-focus chat input so keyboard opens when user opens the site */
+/* Mobile: focus chat input on load so the on-screen keyboard can open (Android/WebView usually works; iOS may require a tap first). */
 (function setupMobileAutoFocus() {
-    function tryFocusInput() {
-        if (!window.matchMedia || !window.matchMedia("(max-width: 768px)").matches) return;
-        var input = document.getElementById("messageInput");
-        if (input) {
-            setTimeout(function () { input.focus(); }, 400);
+    function isMobileViewport() {
+        try {
+            return window.matchMedia("(max-width: 768px)").matches;
+        } catch (e) {
+            return window.innerWidth <= 768;
         }
     }
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", tryFocusInput);
-    } else {
-        tryFocusInput();
+
+    function focusChatInput() {
+        if (!isMobileViewport()) return;
+        var input = document.getElementById("messageInput");
+        if (!input) return;
+        var box = input.closest(".input-box");
+        try {
+            if (box) {
+                box.scrollIntoView({ block: "end", behavior: "smooth" });
+            } else {
+                input.scrollIntoView({ block: "end", behavior: "smooth" });
+            }
+        } catch (e) {
+            input.scrollIntoView(false);
+        }
+        try {
+            input.removeAttribute("readonly");
+        } catch (e2) {}
+        function attempt() {
+            try {
+                input.focus({ preventScroll: true });
+            } catch (e3) {
+                try {
+                    input.focus();
+                } catch (e4) {}
+            }
+        }
+        attempt();
+        setTimeout(attempt, 120);
+        setTimeout(attempt, 450);
+        setTimeout(attempt, 900);
     }
+
+    function schedule() {
+        setTimeout(focusChatInput, 0);
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", schedule);
+    } else {
+        schedule();
+    }
+    window.addEventListener("load", function () {
+        setTimeout(focusChatInput, 200);
+    });
+    window.addEventListener("pageshow", function (ev) {
+        if (ev.persisted) setTimeout(focusChatInput, 100);
+    });
 })();
 
 /* Update Chat Documents toggle text, mobile count, and input placeholder on resize */

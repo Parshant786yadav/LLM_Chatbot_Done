@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DocuMind</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
+    <link rel="apple-touch-icon" href="/static/favicon.png?v=4">
     <link rel="stylesheet" href="../static/style.css">
 </head>
 <body>
@@ -46,7 +48,7 @@
             </div>
         </div>
 
-        <hr>
+        <a href="/how-it-works" class="sidebar-how-link">How it works?</a>
 
         <h3>DocuMind</h3>
         <button onclick="createChat()">+ New Chat</button>
@@ -88,7 +90,7 @@
                     <h4 class="api-keys-title">API keys (global documents)</h4>
                     <p class="api-keys-desc">Embed in your site; answers use only documents uploaded here (global), not chat-specific files.</p>
                     <div class="api-keys-actions">
-                        <input type="text" id="globalApiKeyLabel" class="api-keys-input" placeholder="Label (optional)" maxlength="80">
+                        <input type="text" id="globalApiKeyLabel" class="api-keys-input" placeholder="nickname (optional)" maxlength="80">
                         <button type="button" class="api-keys-btn" id="globalApiKeyCreateBtn" onclick="createGlobalApiKey()">Create key</button>
                         <button type="button" class="api-keys-btn api-keys-btn--ghost" onclick="refreshApiKeys()">Refresh list</button>
                     </div>
@@ -119,7 +121,7 @@
                         <div class="chat-docs-panel-inner">
                             <div class="chat-docs-main">
                                 <div class="chat-docs-upload-toolbar-inner">
-                                    <button type="button" class="chat-docs-upload-trigger" id="chatDocsUploadPopoverBtn" onclick="toggleChatDocsUploadPopover(event)" aria-expanded="false" aria-haspopup="true" aria-controls="chatDocsUploadPopover" title="Upload document" aria-label="Upload document"><svg class="chat-header-btn-icon chat-header-btn-icon--doc" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="18" x2="12" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="9 14 12 11 15 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chat-docs-upload-label-full">Upload document</span><span class="chat-docs-upload-label-mobile-bar">Document upload</span></button>
+                                    <button type="button" class="chat-docs-upload-trigger" id="chatDocsUploadPopoverBtn" onclick="toggleChatDocsUploadPopover(event)" aria-expanded="false" aria-haspopup="true" aria-controls="chatDocsUploadPopover" title="Document upload" aria-label="Document upload"><svg class="chat-header-btn-icon chat-header-btn-icon--doc chat-header-btn-icon-desktop" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="18" x2="12" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="9 14 12 11 15 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="chat-header-btn-icon chat-header-btn-icon--doc chat-header-btn-icon--mobile" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="18" x2="12" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="9 14 12 11 15 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chat-docs-upload-label chat-header-label-desktop">Document upload</span><span class="chat-header-label-mobile">Upload</span></button>
                                     <div id="chatDocsUploadPopover" class="chat-docs-upload-popover" role="dialog" aria-labelledby="chatDocsUploadPopoverHeading" aria-hidden="true">
                                         <h4 class="chat-docs-panel-title" id="chatDocsUploadPopoverHeading">Chat Documents</h4>
                                         <input type="file" id="chatUpload" accept=".pdf,application/pdf" onchange="uploadChatDoc()" class="chat-docs-upload">
@@ -130,12 +132,12 @@
                             </div>
                             <div id="chatApiKeyToolbar" class="chat-api-key-toolbar" style="display: none;">
                                 <div class="chat-api-key-toolbar-inner">
-                                    <button type="button" class="chat-api-key-trigger" id="chatApiKeyPopoverBtn" onclick="toggleChatApiKeyPopover(event)" aria-expanded="false" aria-haspopup="true" aria-controls="chatApiKeyPopover" title="Create API key" aria-label="Create API key"><svg class="chat-header-btn-icon chat-header-btn-icon--key" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="16" r="3" stroke="currentColor" stroke-width="2"/><path d="M11 16h9M11 16l2.5-2.5M20 16v-3.5l-2-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chat-api-key-label-full">Create API key</span><span class="chat-api-key-label-short" aria-hidden="true">API key</span></button>
+                                    <button type="button" class="chat-api-key-trigger" id="chatApiKeyPopoverBtn" onclick="toggleChatApiKeyPopover(event)" aria-expanded="false" aria-haspopup="true" aria-controls="chatApiKeyPopover" title="Create API key" aria-label="Create API key"><svg class="chat-header-btn-icon chat-header-btn-icon--key chat-header-btn-icon-desktop" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="16" r="3" stroke="currentColor" stroke-width="2"/><path d="M11 16h9M11 16l2.5-2.5M20 16v-3.5l-2-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chat-api-key-label chat-header-label-desktop">Create API key</span><span class="chat-header-label-mobile">API key <span class="chat-header-api-emoji-mobile" aria-hidden="true">🗝️</span></span></button>
                                     <div id="chatApiKeyPopover" class="chat-api-key-popover" role="dialog" aria-labelledby="chatApiKeyPopoverHeading" aria-hidden="true">
-                                        <p id="chatApiKeyPopoverHeading" class="api-keys-title">API key (this chat only)</p>
-                                        <p class="api-keys-desc">Answers only use PDFs uploaded in this chat.</p>
+                                        <p id="chatApiKeyPopoverHeading" class="api-keys-title">Create API key</p>
+                                        <p class="api-keys-desc">Answers only use PDFs uploaded in this chat</p>
                                         <div class="api-keys-actions">
-                                            <input type="text" id="chatApiKeyLabel" class="api-keys-input" placeholder="Label (optional)" maxlength="80">
+                                            <input type="text" id="chatApiKeyLabel" class="api-keys-input" placeholder="nickname (optional)" maxlength="80">
                                             <button type="button" class="api-keys-btn" id="chatApiKeyCreateBtn" onclick="createChatApiKey()">Create key</button>
                                         </div>
                                         <p id="chatApiKeyReveal" class="api-keys-reveal" style="display: none;" aria-live="polite"></p>

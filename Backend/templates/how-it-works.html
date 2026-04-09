@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How it works? — DocuMind</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
+    <link rel="stylesheet" href="/static/how-it-works.css?v=1">
+</head>
+<body class="how-page">
+
+<nav class="how-nav">
+    <span class="how-nav-brand">DocuMind</span>
+    <a href="/">← Back to chat</a>
+</nav>
+
+<main class="how-wrap">
+    <h1>How it works?</h1>
+    <p class="how-lead">
+        DocuMind answers from <strong>your uploaded PDFs</strong> using retrieval (RAG). The web app and the HTTP API share the same backend—use whichever fits your workflow.
+    </p>
+
+    <section class="how-card" id="personal">
+        <h2><span class="how-tag how-tag--blue">Personal</span> Workspace</h2>
+        <p>
+            You sign in with your email (one-time code). Your account is a <strong>personal</strong> workspace: you create chats, upload PDFs, and ask questions in natural language.
+        </p>
+        <h3>Documents</h3>
+        <ul>
+            <li><strong>Global documents</strong> — PDFs you add under “Global Documents” are available across your account. Good for policies, manuals, or reference material you want in every chat context.</li>
+            <li><strong>Per-chat documents</strong> — When you upload while a chat is open, files can be tied to that chat so answers stay scoped to that conversation’s knowledge.</li>
+            <li>Uploads are <strong>PDF only</strong> right now. Text is extracted (including OCR on sparse pages when needed) and embedded for search.</li>
+        </ul>
+        <h3>Chat</h3>
+        <p>
+            Each chat keeps its own message history. The model uses retrieved chunks from the documents that apply to that session (global and/or chat-scoped, depending on what you uploaded and how keys are scoped—see API below).
+        </p>
+    </section>
+
+    <section class="how-card" id="company">
+        <h2><span class="how-tag how-tag--slate">Company</span> mode</h2>
+        <p>
+            If your organization uses company logins, DocuMind can attach users to a <strong>shared company library</strong> based on email domain (e.g. <code>you@acme.com</code>).
+        </p>
+        <ul>
+            <li><strong>HR uploads</strong> — Typically only an HR-style address (e.g. <code>hr@yourcompany.com</code>) can upload <strong>company</strong> PDFs. Those become the knowledge base for employees at the same company.</li>
+            <li><strong>Employees</strong> — Can read and chat against those documents; they do not replace HR uploads unless your deployment allows it.</li>
+            <li><strong>Visibility</strong> — Admins may control whether document counts are visible to all employees (see the sidebar options when you are logged in as HR).</li>
+        </ul>
+        <div class="how-note">
+            <strong>API keys</strong> are available only for <strong>personal</strong> accounts (not company-type users). Use the web UI for company libraries, or integrate via your own backend that calls DocuMind with appropriate auth if you expose that internally.
+        </div>
+    </section>
+
+    <section class="how-card" id="api">
+        <h2>HTTP API</h2>
+        <p>
+            Call <code>POST /api/v1/chat</code> for a full JSON reply, or <code>POST /api/v1/chat/stream</code> for <strong>SSE</strong> token streaming. Send your user-created API key in the header <code>Authorization: Bearer &lt;api_key&gt;</code>.
+        </p>
+        <h3>Create keys (personal only)</h3>
+        <ul>
+            <li>In the sidebar, use <strong>API keys (global documents)</strong> for a key that only sees <strong>global</strong> uploads.</li>
+            <li>For a key scoped to <strong>one chat</strong>, create it from the chat flow in the app (scope <code>chat</code> + chat name) so retrieval uses that chat’s document scope.</li>
+        </ul>
+        <h3>Request body</h3>
+        <p>
+            JSON object: <code>message</code> (string, required) and optional <code>history</code> — an array of <code>{"role":"user"|"assistant","content":"..."}</code> (up to ~120 turns). Responses are compact for API use.
+        </p>
+
+        <h3>Non-streaming: <code>POST /api/v1/chat</code></h3>
+        <div class="how-terminal" aria-label="API example: chat">
+            <div class="how-terminal-head">
+                <div class="how-terminal-dots" aria-hidden="true">
+                    <span class="how-dot-red"></span>
+                    <span class="how-dot-yellow"></span>
+                    <span class="how-dot-green"></span>
+                </div>
+                <div class="how-terminal-tabs">
+                    <button type="button" class="how-tab how-tab--active" data-h-tab="curl">cURL</button>
+                    <button type="button" class="how-tab" data-h-tab="javascript">JavaScript</button>
+                    <button type="button" class="how-tab" data-h-tab="python">Python</button>
+                </div>
+                <div class="how-terminal-tabs" aria-hidden="true">
+                    <span class="how-tab how-tab--accent" style="cursor:default;opacity:0.85">REST · POST</span>
+                </div>
+            </div>
+            <div class="how-terminal-sub" data-for-tab="curl">
+                <button type="button" class="how-tab how-sub-tab how-tab--active" data-h-sub="curl-bash">Bash · macOS &amp; Linux</button>
+                <button type="button" class="how-tab how-sub-tab how-tab--accent" data-h-sub="curl-pwsh">Windows · PowerShell</button>
+            </div>
+            <div class="how-terminal-body">
+                <div class="how-copy-wrap">
+                    <button type="button" class="how-copy-btn">Copy</button>
+                </div>
+                <pre class="how-snippet how-snippet--active" data-h-snippet="curl-bash"><span class="how-cmt"># Replace YOUR_BASE_URL and YOUR_API_KEY. Response: {"reply":"..."} or {"error":"..."}.</span>
+<span class="how-prompt">$</span> curl -sS -X POST "YOUR_BASE_URL/api/v1/chat" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Summarize my uploaded policy.","history":[]}'</pre>
+                <pre class="how-snippet" data-h-snippet="curl-pwsh"><span class="how-cmt"># PowerShell — same endpoint; escape quotes as shown.</span>
+<span class="how-prompt">PS&gt;</span> $body = '{"message":"Summarize my uploaded policy.","history":[]}'
+<span class="how-prompt">PS&gt;</span> Invoke-RestMethod -Uri "YOUR_BASE_URL/api/v1/chat" -Method Post `
+  -Headers @{ Authorization = "Bearer YOUR_API_KEY" } -Body $body -ContentType "application/json"</pre>
+                <pre class="how-snippet" data-h-snippet="javascript"><span class="how-cmt">// Browser or Node 18+ (fetch). Use your real origin in production.</span>
+<span class="how-prompt">$</span> const BASE = "YOUR_BASE_URL";
+<span class="how-prompt">$</span> const key = "YOUR_API_KEY";
+<span class="how-prompt">$</span> const res = await fetch(BASE + "/api/v1/chat", {
+<span class="how-prompt">$</span>   method: "POST",
+<span class="how-prompt">$</span>   headers: {
+<span class="how-prompt">$</span>     "Authorization": "Bearer " + key,
+<span class="how-prompt">$</span>     "Content-Type": "application/json",
+<span class="how-prompt">$</span>   },
+<span class="how-prompt">$</span>   body: JSON.stringify({
+<span class="how-prompt">$</span>     message: "Summarize my uploaded policy.",
+<span class="how-prompt">$</span>     history: [{ role: "user", content: "Hi" }, { role: "assistant", content: "Hello!" }],
+<span class="how-prompt">$</span>   }),
+<span class="how-prompt">$</span> });
+<span class="how-prompt">$</span> const data = await res.json();
+<span class="how-prompt">$</span> console.log(data.reply);</pre>
+                <pre class="how-snippet" data-h-snippet="python"><span class="how-cmt"># pip install requests</span>
+<span class="how-prompt">$</span> import requests
+<span class="how-prompt">$</span> r = requests.post(
+<span class="how-prompt">$</span>     "YOUR_BASE_URL/api/v1/chat",
+<span class="how-prompt">$</span>     headers={"Authorization": "Bearer YOUR_API_KEY", "Content-Type": "application/json"},
+<span class="how-prompt">$</span>     json={"message": "Summarize my uploaded policy.", "history": []},
+<span class="how-prompt">$</span> )
+<span class="how-prompt">$</span> print(r.json())</pre>
+            </div>
+        </div>
+
+        <h3>Streaming: <code>POST /api/v1/chat/stream</code></h3>
+        <p>
+            Same body and <code>Authorization</code> header. The response is <code>text/event-stream</code>. Each SSE data line is JSON: deltas <code>{"t":"d","c":"..."}</code>, then <code>{"t":"done"}</code>, or errors <code>{"t":"e","m":"...","code":...}</code> (still HTTP 200 in many cases—parse the event type).
+        </p>
+        <div class="how-terminal" aria-label="API example: stream">
+            <div class="how-terminal-head">
+                <div class="how-terminal-dots" aria-hidden="true">
+                    <span class="how-dot-red"></span>
+                    <span class="how-dot-yellow"></span>
+                    <span class="how-dot-green"></span>
+                </div>
+                <div class="how-terminal-tabs">
+                    <button type="button" class="how-tab how-tab--active" data-h-tab="scurl">cURL</button>
+                    <button type="button" class="how-tab" data-h-tab="sjavascript">JavaScript</button>
+                    <button type="button" class="how-tab" data-h-tab="spython">Python</button>
+                </div>
+                <div class="how-terminal-tabs">
+                    <button type="button" class="how-tab how-tab--accent how-tab--active" style="cursor:default" tabindex="-1">SSE · β</button>
+                </div>
+            </div>
+            <div class="how-terminal-sub" data-for-tab="scurl">
+                <button type="button" class="how-tab how-sub-tab how-tab--active" data-h-sub="scurl-bash">Bash</button>
+                <button type="button" class="how-tab how-sub-tab how-tab--accent" data-h-sub="scurl-pwsh">PowerShell</button>
+            </div>
+            <div class="how-terminal-body">
+                <div class="how-copy-wrap">
+                    <button type="button" class="how-copy-btn">Copy</button>
+                </div>
+                <pre class="how-snippet how-snippet--active" data-h-snippet="scurl-bash"><span class="how-cmt"># Raw SSE on stdout; use -N so curl disables buffering.</span>
+<span class="how-prompt">$</span> curl -N -X POST "YOUR_BASE_URL/api/v1/chat/stream" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{"message":"Say hello in one sentence.","history":[]}'</pre>
+                <pre class="how-snippet" data-h-snippet="scurl-pwsh"><span class="how-cmt"># Windows: curl.exe streams SSE (ships with Windows 10+).</span>
+<span class="how-prompt">PS&gt;</span> curl.exe -N -X POST "YOUR_BASE_URL/api/v1/chat/stream" ^
+  -H "Authorization: Bearer YOUR_API_KEY" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"message\":\"Say hello in one sentence.\",\"history\":[]}"</pre>
+                <pre class="how-snippet" data-h-snippet="sjavascript"><span class="how-cmt">// Fetch + ReadableStream: parse lines starting with "data: ".</span>
+<span class="how-prompt">$</span> const BASE = "YOUR_BASE_URL";
+<span class="how-prompt">$</span> const res = await fetch(BASE + "/api/v1/chat/stream", {
+<span class="how-prompt">$</span>   method: "POST",
+<span class="how-prompt">$</span>   headers: {
+<span class="how-prompt">$</span>     Authorization: "Bearer YOUR_API_KEY",
+<span class="how-prompt">$</span>     "Content-Type": "application/json",
+<span class="how-prompt">$</span>     Accept: "text/event-stream",
+<span class="how-prompt">$</span>   },
+<span class="how-prompt">$</span>   body: JSON.stringify({ message: "Say hello.", history: [] }),
+<span class="how-prompt">$</span> });
+<span class="how-prompt">$</span> const reader = res.body.getReader();
+<span class="how-prompt">$</span> const dec = new TextDecoder();
+<span class="how-prompt">$</span> let buf = "", out = "";
+<span class="how-prompt">$</span> while (true) {
+<span class="how-prompt">$</span>   const { value, done } = await reader.read();
+<span class="how-prompt">$</span>   if (done) break;
+<span class="how-prompt">$</span>   buf += dec.decode(value, { stream: true });
+<span class="how-prompt">$</span>   const lines = buf.split("\n");
+<span class="how-prompt">$</span>   buf = lines.pop() || "";
+<span class="how-prompt">$</span>   for (const line of lines) {
+<span class="how-prompt">$</span>     const m = line.match(/^data:\s*(.+)/);
+<span class="how-prompt">$</span>     if (!m) continue;
+<span class="how-prompt">$</span>     const j = JSON.parse(m[1]);
+<span class="how-prompt">$</span>     if (j.t === "d" &amp;&amp; j.c) out += j.c;
+<span class="how-prompt">$</span>   }
+<span class="how-prompt">$</span> }
+<span class="how-prompt">$</span> console.log(out);</pre>
+                <pre class="how-snippet" data-h-snippet="spython"><span class="how-cmt"># pip install requests</span>
+<span class="how-prompt">$</span> import json, requests
+<span class="how-prompt">$</span> with requests.post(
+<span class="how-prompt">$</span>     "YOUR_BASE_URL/api/v1/chat/stream",
+<span class="how-prompt">$</span>     headers={"Authorization": "Bearer YOUR_API_KEY", "Content-Type": "application/json"},
+<span class="how-prompt">$</span>     json={"message": "Say hello.", "history": []},
+<span class="how-prompt">$</span>     stream=True,
+<span class="how-prompt">$</span> ) as r:
+<span class="how-prompt">$</span>     for line in r.iter_lines(decode_unicode=True):
+<span class="how-prompt">$</span>         if not line or not line.startswith("data:"):
+<span class="how-prompt">$</span>             continue
+<span class="how-prompt">$</span>         j = json.loads(line[5:].lstrip())
+<span class="how-prompt">$</span>         if j.get("t") == "d" and j.get("c"):
+<span class="how-prompt">$</span>             print(j["c"], end="", flush=True)</pre>
+            </div>
+        </div>
+
+        <div class="how-note">
+            <strong>CORS:</strong> If you call the API from a browser on another domain, your DocuMind server must allow that origin (FastAPI middleware / reverse proxy). From a server-side app, CORS does not apply.
+        </div>
+    </section>
+</main>
+
+<script src="/static/how-it-works.js?v=1"></script>
+</body>
+</html>

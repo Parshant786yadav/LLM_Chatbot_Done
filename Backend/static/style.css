@@ -86,6 +86,23 @@ select,
     transform: scale(0.98);
 }
 
+/* Help link under profile divider (before DocuMind title) */
+.sidebar-how-link {
+    display: block;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: #9ca3af;
+    text-decoration: none;
+    margin: 14px 0 14px;
+    transition: color 0.15s ease;
+}
+
+.sidebar-how-link:hover {
+    color: #e5e7eb;
+    text-decoration: underline;
+}
+
 .section {
     margin-top: 15px;
 }
@@ -710,7 +727,7 @@ select,
     }
 
     .chat-container .chat-header {
-        padding: max(8px, env(safe-area-inset-top)) 10px 8px;
+        padding: max(8px, env(safe-area-inset-top)) 10px 10px;
         gap: 8px;
         min-width: 0;
         align-items: center;
@@ -722,7 +739,7 @@ select,
     .chat-container .chat-header .sidebar-toggle {
         align-self: center;
         flex-shrink: 0;
-        background: transparent;
+        background: transparent !important;
         border-radius: 8px;
         width: 36px;
         height: 36px;
@@ -730,6 +747,12 @@ select,
         min-height: 36px;
         margin: 0 2px 0 0;
         padding: 0;
+    }
+
+    .chat-container .chat-header .sidebar-toggle:hover,
+    .chat-container .chat-header .sidebar-toggle:active,
+    .chat-container .chat-header .sidebar-toggle:focus-visible {
+        background: transparent !important;
     }
 
     .chat-container .chat-header .sidebar-toggle .sidebar-toggle-icon {
@@ -752,6 +775,10 @@ select,
     .chat-container .chat-header .chat-docs-panel {
         align-self: center;
         margin-left: auto;
+        margin-right: 0;
+        flex: 0 0 auto;
+        width: auto !important;
+        min-width: 0 !important;
         max-width: calc(100% - 48px);
     }
 
@@ -765,7 +792,7 @@ select,
         padding: 0 !important;
         display: flex;
         flex-direction: column;
-        align-items: stretch;
+        align-items: flex-end;
     }
 
     .chat-docs-panel-inner {
@@ -773,8 +800,10 @@ select,
         flex-direction: row;
         align-items: center;
         justify-content: flex-end;
+        flex-wrap: nowrap;
         gap: 8px;
         width: auto;
+        max-width: 100%;
     }
 
     .chat-api-key-toolbar {
@@ -806,49 +835,92 @@ select,
         align-items: center;
     }
 
-    .chat-docs-upload-label-full {
+    /* Header actions: hide desktop SVG + long labels; show mobile icon + short copy */
+    .chat-header-btn-icon-desktop,
+    .chat-header-label-desktop {
         display: none !important;
     }
 
-    .chat-docs-upload-label-mobile-bar {
+    .chat-header-label-mobile,
+    .chat-header-api-emoji-mobile {
         display: inline !important;
     }
 
-    .chat-api-key-label-short {
-        display: none !important;
-    }
-
-    .chat-api-key-label-full {
-        display: inline !important;
-    }
-
-    .chat-header-btn-icon {
-        display: block;
+    .chat-header-btn-icon--mobile {
+        display: block !important;
+        width: 16px;
+        height: 16px;
         flex-shrink: 0;
+        color: #047857;
     }
 
+    .chat-header-api-emoji-mobile {
+        font-size: 13px;
+        line-height: 1;
+        vertical-align: -1px;
+    }
+
+    /*
+     * Mobile header chips — readable, balanced touch targets, soft pill style.
+     * (Large desktop styles are scoped to min-width 769px so these always apply on phones.)
+     */
     .chat-docs-upload-trigger,
     .chat-api-key-trigger {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
-        padding: 8px 10px;
-        font-size: 11px;
-        font-weight: 600;
-        line-height: 1.2;
-        white-space: nowrap;
-        flex-shrink: 1;
+        cursor: pointer;
+        margin: 0;
+        padding: 8px 14px;
+        min-height: 36px;
         min-width: 0;
-        border-radius: 10px;
+        box-sizing: border-box;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: -0.015em;
+        line-height: 1.2;
+        border-radius: 999px;
+        border-style: solid;
+        border-width: 1px;
+        white-space: nowrap;
+        -webkit-tap-highlight-color: transparent;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+        transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+        gap: 6px;
     }
 
-    .chat-header-btn-icon--doc {
-        color: #166534;
+    .chat-docs-upload-trigger:active,
+    .chat-api-key-trigger:active {
+        transform: scale(0.98);
+        box-shadow: 0 0 0 rgba(15, 23, 42, 0);
     }
 
-    .chat-header-btn-icon--key {
-        color: #1e40af;
+    .chat-docs-upload-trigger {
+        color: #047857;
+        background: #ecfdf5;
+        border-color: #6ee7b7;
+    }
+
+    .chat-docs-upload-trigger:hover {
+        background: #d1fae5;
+        border-color: #34d399;
+    }
+
+    .chat-api-key-trigger {
+        color: #1d4ed8;
+        background: #eff6ff;
+        border-color: #93c5fd;
+    }
+
+    .chat-api-key-trigger:hover {
+        background: #dbeafe;
+        border-color: #60a5fa;
+    }
+
+    .chat-docs-upload-trigger:focus-visible,
+    .chat-api-key-trigger:focus-visible {
+        outline: 2px solid #3b82f6;
+        outline-offset: 2px;
     }
 
     .chat-docs-panel .chat-docs-list li {
@@ -1120,23 +1192,73 @@ select,
     position: relative;
 }
 
-.chat-docs-upload-trigger {
-    display: inline-block;
-    padding: 6px 10px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #166534;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-    white-space: nowrap;
-}
+/* Chat header actions — large ghost buttons (desktop/tablet only; mobile uses compact rules in @media max-width 768px) */
+@media (min-width: 769px) {
+    .chat-docs-upload-trigger,
+    .chat-api-key-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 14px;
+        min-height: 40px;
+        box-sizing: border-box;
+        font-size: 13px;
+        font-weight: 600;
+        font-family: inherit;
+        line-height: 1.2;
+        border-radius: 10px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
 
-.chat-docs-upload-trigger:hover {
-    background: #dcfce7;
-    border-color: #86efac;
+    .chat-header-btn-icon {
+        flex-shrink: 0;
+        width: 18px;
+        height: 18px;
+        display: block;
+    }
+
+    .chat-docs-upload-trigger {
+        color: #15803d;
+        background: rgba(240, 253, 244, 0.92);
+        border: 1px solid #4ade80;
+    }
+
+    .chat-docs-upload-trigger:hover {
+        background: #dcfce7;
+        border-color: #22c55e;
+        color: #14532d;
+    }
+
+    .chat-docs-upload-trigger .chat-header-btn-icon--doc {
+        color: #15803d;
+    }
+
+    .chat-docs-upload-trigger:hover .chat-header-btn-icon--doc {
+        color: #14532d;
+    }
+
+    .chat-api-key-trigger {
+        color: #1d4ed8;
+        background: rgba(239, 246, 255, 0.95);
+        border: 1px solid #60a5fa;
+    }
+
+    .chat-api-key-trigger:hover {
+        background: #dbeafe;
+        border-color: #3b82f6;
+        color: #1e3a8a;
+    }
+
+    .chat-api-key-trigger .chat-header-btn-icon--key {
+        color: #1d4ed8;
+    }
+
+    .chat-api-key-trigger:hover .chat-header-btn-icon--key {
+        color: #1e3a8a;
+    }
 }
 
 .chat-docs-upload-popover {
@@ -1174,41 +1296,16 @@ select,
     position: relative;
 }
 
-.chat-api-key-trigger {
-    display: inline-block;
-    padding: 6px 10px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #1e40af;
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-    white-space: nowrap;
-}
-
-.chat-api-key-trigger:hover {
-    background: #dbeafe;
-    border-color: #93c5fd;
-}
-
-.chat-api-key-label-short {
-    display: none;
-}
-
-/* Icons + “Document upload” label are mobile header only; web keeps text-only buttons. */
-.chat-header-btn-icon {
-    display: none;
-}
-
-.chat-docs-upload-label-mobile-bar {
-    display: none;
-}
-
-.chat-api-key-label-full,
-.chat-docs-upload-label-full {
+.chat-docs-upload-label,
+.chat-api-key-label {
     display: inline;
+}
+
+/* Mobile-only labels + upload SVG; hidden on desktop */
+.chat-header-label-mobile,
+.chat-header-btn-icon--mobile,
+.chat-header-api-emoji-mobile {
+    display: none;
 }
 
 .chat-api-key-popover {
@@ -1234,6 +1331,30 @@ select,
 
 .chat-api-key-popover .api-keys-input {
     max-width: 100%;
+}
+
+/*
+ * Mobile: header popovers were clipped (left side cut off) because .chat-container uses overflow:hidden
+ * and the panel was position:absolute with a wide min-width. Fixed + horizontal center keeps the sheet on-screen.
+ */
+@media (max-width: 768px) {
+    .chat-docs-upload-popover,
+    .chat-api-key-popover {
+        position: fixed;
+        left: 50%;
+        right: auto;
+        top: max(52px, calc(env(safe-area-inset-top, 0px) + 44px));
+        bottom: auto;
+        transform: translateX(-50%);
+        width: min(320px, calc(100vw - 24px));
+        min-width: 0;
+        max-width: calc(100vw - 24px);
+        max-height: min(480px, 72vh);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        z-index: 200;
+        margin: 0;
+    }
 }
 
 @media (min-width: 769px) {
@@ -1311,6 +1432,11 @@ select,
     animation: messageRowIn 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Space between assistant avatar and reply bubble */
+.message-row--assistant {
+    gap: 12px;
+}
+
 @keyframes messageRowIn {
     from {
         opacity: 0;
@@ -1327,6 +1453,16 @@ select,
     height: 32px;
     border-radius: 50%;
     object-fit: cover;
+    flex-shrink: 0;
+}
+
+/* DocuMind logo (transparent PNG) next to assistant replies */
+.message-avatar--bot {
+    border-radius: 8px;
+    object-fit: contain;
+    background: transparent;
+    width: 36px;
+    height: 36px;
     flex-shrink: 0;
 }
 
