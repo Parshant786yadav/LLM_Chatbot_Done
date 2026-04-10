@@ -768,7 +768,7 @@ select,
         border-radius: 1px;
     }
 
-    .chat-container .chat-header h3 {
+    .chat-container .chat-header .chat-header-brand {
         display: none !important;
     }
 
@@ -1033,8 +1033,7 @@ select,
 /* Header: same at start and after — chat name left, Chat Documents right (like 2nd SS) */
 .chat-container .chat-header {
     display: flex;
-    /* align-items: flex-start; */
-    align-items: start;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
     padding: 10px 16px;
@@ -1154,12 +1153,32 @@ select,
     border-bottom: 1px solid #ddd;
 }
 
+.chat-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.chat-header-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
 .chat-header h3 {
     margin: 0;
     flex: 1;
     min-width: 0;
     font-size: 1rem;
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Chat Documents panel - upper right, plain (no box lines); wide layout desktop only */
@@ -1616,19 +1635,14 @@ select,
     text-align: center;
 }
 
-.login-popup-logo {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
+.login-popup-logo-img {
+    display: block;
+    width: 40px;
+    height: 40px;
     margin: 0 auto 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: #fff;
-    background: #2563eb;
+    border-radius: 10px;
+    object-fit: cover;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
 }
 
 .login-popup-brand-title {
