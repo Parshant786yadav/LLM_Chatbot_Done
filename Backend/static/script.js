@@ -1287,6 +1287,13 @@ async function revokeApiKey(keyId) {
 
 /* ---------------- DOCUMENTS (PERSONAL MODE ONLY) ---------------- */
 
+function checkLoginBeforeUpload(event) {
+    if (!userEmail) {
+        event.preventDefault();
+        toast("Please signin first.", "info");
+    }
+}
+
 function uploadGlobal() {
     if (loginMode !== "personal") return;
     const file = document.getElementById("globalUpload").files[0];
@@ -1845,7 +1852,7 @@ async function uploadDocument() {
     }
 
     if (!userEmail) {
-        toast("Please sign in to upload documents.", "info");
+        toast("Please signin first.", "info");
         return;
     }
 

@@ -23,6 +23,7 @@
     font-size: 12px;
     color: #ccc;
 }
+
 html {
     scroll-behavior: smooth;
 }
@@ -969,13 +970,16 @@ select,
 .chat-container:not(.has-messages) .chat-header {
     flex-shrink: 0;
 }
+
 .chat-container:not(.has-messages) .chat-area {
     flex: 1;
     min-height: 0;
 }
+
 .chat-container:not(.has-messages) .start-spacer {
     display: none;
 }
+
 .chat-container.has-messages .start-spacer {
     display: none;
 }
@@ -991,9 +995,11 @@ select,
     max-width: 420px;
     align-self: center;
 }
+
 .chat-container:not(.has-messages) .start-prompt {
     display: block;
 }
+
 .chat-container.has-messages .start-prompt {
     display: none;
 }
@@ -1047,6 +1053,7 @@ select,
     border: none;
     border-top: none;
 }
+
 .chat-container:not(.has-messages) .input-box {
     padding: 16px 20px;
     background: #fff;
@@ -1058,11 +1065,13 @@ select,
     margin-bottom: 220px;
     transition: max-width 0.4s cubic-bezier(0.4, 0, 0.2, 1), margin 0.35s ease, align-self 0.35s ease;
 }
+
 .chat-container:not(.has-messages) .input-box input {
     padding: 12px 16px;
     font-size: 0.9375rem;
     border-radius: 12px;
 }
+
 .chat-container:not(.has-messages) .input-box button {
     padding: 12px 20px;
     font-size: inherit;
@@ -1213,6 +1222,7 @@ select,
 
 /* Chat header actions — large ghost buttons (desktop/tablet only; mobile uses compact rules in @media max-width 768px) */
 @media (min-width: 769px) {
+
     .chat-docs-upload-trigger,
     .chat-api-key-trigger {
         display: inline-flex;
@@ -1357,6 +1367,7 @@ select,
  * and the panel was position:absolute with a wide min-width. Fixed + horizontal center keeps the sheet on-screen.
  */
 @media (max-width: 768px) {
+
     .chat-docs-upload-popover,
     .chat-api-key-popover {
         position: fixed;
@@ -1461,6 +1472,7 @@ select,
         opacity: 0;
         transform: translateY(8px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -1525,10 +1537,11 @@ select,
     color: white;
     border: none;
 }
+
 .modal {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1568,16 +1581,19 @@ select,
     pointer-events: none;
     transition: opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.28s;
 }
+
 .popup.is-open {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
 }
+
 .popup .popup-box {
     transform: scale(0.94) translateY(16px);
     opacity: 0;
     transition: transform 0.32s cubic-bezier(0.34, 1.15, 0.64, 1), opacity 0.28s ease;
 }
+
 .popup.is-open .popup-box {
     transform: scale(1) translateY(0);
     opacity: 1;
@@ -1776,11 +1792,13 @@ select,
 #loginStep2 {
     animation: loginStepFade 0.28s ease;
 }
+
 @keyframes loginStepFade {
     from {
         opacity: 0;
         transform: translateY(6px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -1884,11 +1902,13 @@ select,
     gap: 12px;
     margin: 16px 0 12px;
 }
+
 .login-popup-or-line {
     flex: 1;
     height: 1px;
     background: #dee2e6;
 }
+
 .login-popup-or-text {
     font-size: 0.75rem;
     font-weight: 600;
@@ -1934,6 +1954,7 @@ select,
     display: inline-flex;
     flex-shrink: 0;
 }
+
 .popup-google-icon svg {
     display: block;
 }
@@ -1986,6 +2007,7 @@ select,
     margin-top: 5px;
     color: #ccc;
 }
+
 /* ---------- PROFILE SECTION ---------- */
 .profile-section {
     position: relative;
@@ -2026,6 +2048,7 @@ select,
     color: #374151;
     border: 1px solid #d1d5db;
 }
+
 .profile-section .google-login-btn:hover {
     background: #f9fafb;
     border-color: #9ca3af;
@@ -2180,10 +2203,12 @@ select,
     font-size: 12px;
     color: #374151;
 }
+
 .profile-user-id-label {
     margin-right: 6px;
     color: #6b7280;
 }
+
 .profile-user-id-value {
     font-weight: 600;
     font-family: monospace;
@@ -2201,9 +2226,11 @@ select,
     cursor: pointer;
     transition: background 0.2s ease, transform 0.12s ease;
 }
+
 .admin-db-btn:hover {
     background: #4b5563;
 }
+
 .admin-db-btn:active {
     transform: scale(0.98);
 }
@@ -2217,16 +2244,19 @@ select,
     overflow: hidden;
     animation: databaseViewIn 0.32s ease;
 }
+
 @keyframes databaseViewIn {
     from {
         opacity: 0;
         transform: translateY(6px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
     }
 }
+
 .database-view-header {
     flex-shrink: 0;
     display: flex;
@@ -2234,9 +2264,11 @@ select,
     align-items: center;
     margin-bottom: 15px;
 }
+
 .database-view-header h3 {
     margin: 0;
 }
+
 .back-to-chat-btn {
     padding: 8px 14px;
     background: #2563eb;
@@ -2246,12 +2278,15 @@ select,
     cursor: pointer;
     transition: background 0.2s ease, transform 0.12s ease;
 }
+
 .back-to-chat-btn:hover {
     background: #1d4ed8;
 }
+
 .back-to-chat-btn:active {
     transform: scale(0.98);
 }
+
 .admin-add-admin {
     flex-shrink: 0;
     margin-bottom: 20px;
@@ -2259,15 +2294,18 @@ select,
     background: #f3f4f6;
     border-radius: 8px;
 }
+
 .admin-add-admin h4 {
     margin-top: 0;
     margin-bottom: 10px;
 }
+
 .admin-add-admin input {
     padding: 6px 10px;
     margin-right: 8px;
     width: 220px;
 }
+
 .admin-add-admin button {
     padding: 6px 12px;
     background: #2563eb;
@@ -2276,11 +2314,13 @@ select,
     border-radius: 4px;
     cursor: pointer;
 }
+
 .admin-list-label {
     margin: 10px 0 0;
     font-size: 13px;
     color: #4b5563;
 }
+
 .admin-list-toggle {
     display: block;
     width: 10%;
@@ -2296,28 +2336,34 @@ select,
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
 }
+
 .admin-list-toggle:hover {
     background: #d1d5db;
     border-color: #9ca3af;
 }
+
 .admin-list-with-remove .admin-list-ul.admin-list-dropdown {
     list-style: none;
     padding: 8px 0 0;
     margin: 4px 0 0;
 }
+
 .admin-list-with-remove .admin-list-ul.admin-list-dropdown .admin-list-li {
     margin-bottom: 8px;
 }
+
 .admin-list-empty {
     color: #6b7280;
     font-size: 13px;
 }
+
 .admin-list-li {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 6px;
 }
+
 .admin-remove-btn {
     padding: 4px 10px;
     font-size: 12px;
@@ -2327,13 +2373,16 @@ select,
     border-radius: 4px;
     cursor: pointer;
 }
+
 .admin-remove-btn:hover {
     background: #b91c1c;
 }
+
 .db-search-wrap {
     flex-shrink: 0;
     margin-bottom: 10px;
 }
+
 .db-search-input {
     width: 100%;
     max-width: 320px;
@@ -2342,6 +2391,7 @@ select,
     border-radius: 6px;
     font-size: 14px;
 }
+
 .database-tables {
     flex: 1;
     min-height: 0;
@@ -2349,6 +2399,7 @@ select,
     display: flex;
     flex-direction: column;
 }
+
 .db-tabs {
     flex-shrink: 0;
     display: flex;
@@ -2356,6 +2407,7 @@ select,
     margin-bottom: 10px;
     flex-wrap: wrap;
 }
+
 .db-tab {
     padding: 8px 14px;
     background: #e5e7eb;
@@ -2365,16 +2417,20 @@ select,
     font-size: 13px;
     transition: background 0.2s ease, transform 0.1s ease;
 }
+
 .db-tab:hover {
     background: #d1d5db;
 }
+
 .db-tab:active {
     transform: scale(0.98);
 }
+
 .db-tab.active {
     background: #2563eb;
     color: white;
 }
+
 .db-table-content {
     overflow: auto;
     flex: 1;
@@ -2385,28 +2441,34 @@ select,
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
 }
+
 .db-doc-link {
     color: #2563eb;
     text-decoration: none;
 }
+
 .db-doc-link:hover {
     text-decoration: underline;
 }
+
 .db-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
 }
+
 .db-table th,
 .db-table td {
     padding: 8px 10px;
     text-align: left;
     border-bottom: 1px solid #e5e7eb;
 }
+
 .db-table th {
     background: #f3f4f6;
     font-weight: 600;
 }
+
 .db-empty {
     padding: 20px;
     color: #6b7280;
@@ -2441,13 +2503,32 @@ select,
     display: inline-block;
     animation: chatLoaderBounce 1.2s infinite ease-in-out;
 }
-.chat-loader-dot:nth-child(1) { animation-delay: 0s; }
-.chat-loader-dot:nth-child(2) { animation-delay: 0.2s; }
-.chat-loader-dot:nth-child(3) { animation-delay: 0.4s; }
+
+.chat-loader-dot:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.chat-loader-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.chat-loader-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
 
 @keyframes chatLoaderBounce {
-    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-    40% { transform: scale(1); opacity: 1; }
+
+    0%,
+    80%,
+    100% {
+        transform: scale(0.6);
+        opacity: 0.4;
+    }
+
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 /* ---------- In-app toasts (replaces browser alert) ---------- */
@@ -2464,7 +2545,7 @@ select,
     align-items: center;
     gap: 10px;
     width: max-content;
-    max-width: min(200px, calc(100vw - 32px));
+    max-width: min(340px, calc(100vw - 32px));
     pointer-events: none;
     box-sizing: border-box;
 }
@@ -2828,6 +2909,7 @@ select,
     html {
         scroll-behavior: auto;
     }
+
     .chat-area,
     .sidebar,
     .doc-list,
@@ -2835,42 +2917,53 @@ select,
     .db-table-content {
         scroll-behavior: auto;
     }
+
     .message-row {
         animation: none;
     }
+
     #loginStep1,
     #loginStep2 {
         animation: none;
     }
+
     .database-view {
         animation: none;
     }
+
     .popup {
         -webkit-backdrop-filter: none;
         backdrop-filter: none;
     }
+
     .popup,
     .popup .popup-box {
         transition: none;
     }
+
     .profile-dropdown,
     .chat-menu-dropdown {
         transition: none;
     }
+
     .chat-docs-upload-popover,
     .chat-api-key-popover {
         transition: none;
     }
+
     .toast {
         transition: none;
     }
+
     .toast.toast--visible,
     .toast.toast--out {
         transform: none;
     }
+
     .toast-icon--spinner .toast-spinner {
         animation: none;
     }
+
     .confirm-dialog-backdrop {
         -webkit-backdrop-filter: none;
         backdrop-filter: none;
