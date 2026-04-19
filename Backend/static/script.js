@@ -2188,65 +2188,6 @@ function googleLogin() {
     history.replaceState({}, document.title, window.location.pathname || "/");
 })();
 
-/* Mobile: focus chat input on load so the on-screen keyboard can open (Android/WebView usually works; iOS may require a tap first). */
-(function setupMobileAutoFocus() {
-    function isMobileViewport() {
-        try {
-            return window.matchMedia("(max-width: 768px)").matches;
-        } catch (e) {
-            return window.innerWidth <= 768;
-        }
-    }
-
-    function focusChatInput() {
-        if (!isMobileViewport()) return;
-        var input = document.getElementById("messageInput");
-        if (!input) return;
-        var box = input.closest(".input-box");
-        try {
-            if (box) {
-                box.scrollIntoView({ block: "end", behavior: "smooth" });
-            } else {
-                input.scrollIntoView({ block: "end", behavior: "smooth" });
-            }
-        } catch (e) {
-            input.scrollIntoView(false);
-        }
-        try {
-            input.removeAttribute("readonly");
-        } catch (e2) {}
-        function attempt() {
-            try {
-                input.focus({ preventScroll: true });
-            } catch (e3) {
-                try {
-                    input.focus();
-                } catch (e4) {}
-            }
-        }
-        attempt();
-        setTimeout(attempt, 120);
-        setTimeout(attempt, 450);
-        setTimeout(attempt, 900);
-    }
-
-    function schedule() {
-        setTimeout(focusChatInput, 0);
-    }
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", schedule);
-    } else {
-        schedule();
-    }
-    window.addEventListener("load", function () {
-        setTimeout(focusChatInput, 200);
-    });
-    window.addEventListener("pageshow", function (ev) {
-        if (ev.persisted) setTimeout(focusChatInput, 100);
-    });
-})();
-
 /* Update Chat Documents toggle text, mobile count, and input placeholder on resize */
 (function setupChatDocsToggleResize() {
     function updateMessageInputPlaceholder() {

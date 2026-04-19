@@ -56,14 +56,20 @@ select,
 
 .sidebar {
     width: 260px;
+    max-width: 100%;
     background: #1f2937;
     color: white;
     padding: 20px;
     display: flex;
     flex-direction: column;
+    overflow-x: hidden;
     overflow-y: auto;
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: auto;
+    touch-action: pan-y;
+    box-sizing: border-box;
 }
 
 .sidebar h2 {
@@ -374,6 +380,7 @@ select,
     margin: 4px 0 0 0;
     font-size: 13px;
     max-height: 180px;
+    overflow-x: hidden;
     overflow-y: auto;
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
@@ -536,6 +543,9 @@ select,
         height: 100%;
         height: 100dvh;
         height: -webkit-fill-available;
+        overflow-x: hidden;
+        width: 100%;
+        max-width: 100%;
     }
 
     body {
@@ -544,7 +554,10 @@ select,
         min-height: 100dvh;
         min-height: -webkit-fill-available;
         overflow: hidden;
+        overflow-x: hidden;
         overscroll-behavior: none;
+        width: 100%;
+        max-width: 100%;
     }
 
     .layout {
@@ -554,6 +567,9 @@ select,
         max-height: 100dvh;
         min-height: 0;
         overflow: hidden;
+        overflow-x: hidden;
+        max-width: 100%;
+        width: 100%;
     }
 
     .main {
@@ -631,11 +647,33 @@ select,
         padding-left: max(20px, env(safe-area-inset-left));
         padding-right: max(20px, env(safe-area-inset-right));
         box-sizing: border-box;
+        overflow-x: hidden;
+        overscroll-behavior-x: none;
+        touch-action: pan-y;
     }
 
     .layout.sidebar-open .sidebar {
         transform: translateX(0);
         box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .sidebar .section,
+    .sidebar #documentSection {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .sidebar .company-show-count-wrap {
+        flex-wrap: wrap;
+    }
+
+    .sidebar .company-doc-hint,
+    .sidebar .company-show-count-wrap span {
+        overflow-wrap: anywhere;
+    }
+
+    .chat-name-edit {
+        font-size: 16px;
     }
 
     .sidebar-toggle {
@@ -727,12 +765,29 @@ select,
     .chat-container .input-box input {
         min-width: 0;
         flex: 1;
+        font-size: 16px;
+        line-height: 1.25;
+    }
+
+    .chat-container:not(.has-messages) .input-box input {
+        font-size: 16px;
     }
 
     .chat-container .input-box button {
         flex-shrink: 0;
         padding: 12px 14px;
         white-space: nowrap;
+    }
+
+    /* iOS: avoid automatic zoom when focusing inputs (needs ≥16px) */
+    .login-popup-input,
+    #newAdminEmail,
+    .db-search-input {
+        font-size: 16px !important;
+    }
+
+    .api-keys-input {
+        font-size: 16px;
     }
 
     .chat-container.has-messages .input-box {
