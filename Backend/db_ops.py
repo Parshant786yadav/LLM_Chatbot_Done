@@ -358,6 +358,36 @@ def get_all_user_api_keys() -> list:
     return r.data or []
 
 
+# ---------- Public contact form (/contact → admin Database tab) ----------
+def insert_contact_submission(
+    name: str,
+    email: str,
+    category: str,
+    message: str,
+) -> dict:
+    payload = {
+        "name": name,
+        "email": email,
+        "category": category,
+        "message": message,
+    }
+    r = get_supabase().table("contact_submissions").insert(payload).execute()
+    if r.data:
+        return r.data[0]
+    return {}
+
+
+def get_all_contact_submissions() -> list:
+    r = (
+        get_supabase()
+        .table("contact_submissions")
+        .select("id, created_at, name, email, category, message")
+        .order("id", desc=True)
+        .execute()
+    )
+    return r.data or []
+
+
 # ---------- Optimized Message Retrieval ----------
 def get_messages_for_chat_optimized(
     chat_id: int,

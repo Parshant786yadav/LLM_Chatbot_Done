@@ -2279,3 +2279,30 @@ function googleLogin() {
         updateChatDocsToggleText();
     }
 })();
+
+/** Dismiss SEO footer strip; preference stored so it stays hidden on return visits */
+(function initSeoFooterDismiss() {
+    var STORAGE_KEY = "documind_seo_footer_hidden";
+    function apply() {
+        var footer = document.getElementById("siteSeoFooter");
+        var btn = document.getElementById("siteSeoFooterClose");
+        if (!footer || !btn) return;
+        try {
+            if (localStorage.getItem(STORAGE_KEY) === "1") {
+                footer.style.display = "none";
+                return;
+            }
+        } catch (e) {}
+        btn.addEventListener("click", function () {
+            try {
+                localStorage.setItem(STORAGE_KEY, "1");
+            } catch (e) {}
+            footer.style.display = "none";
+        });
+    }
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", apply);
+    } else {
+        apply();
+    }
+})();

@@ -1,0 +1,378 @@
+/* Contact page — DocuMind brand (indigo / slate) */
+
+.contact-page {
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(165deg, #0f172a 0%, #1e293b 42%, #f1f5f9 42%, #f8fafc 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #0f172a;
+}
+
+.contact-page .how-nav {
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.contact-shell {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 28px 20px 56px;
+}
+
+.contact-hero {
+    text-align: center;
+    padding: 8px 0 28px;
+    color: #f8fafc;
+}
+
+.contact-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    margin-bottom: 18px;
+}
+
+.contact-hero-badge img {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    object-fit: contain;
+    background: #fff;
+    padding: 4px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.contact-hero-badge span {
+    font-weight: 700;
+    font-size: 1.125rem;
+    letter-spacing: -0.02em;
+}
+
+.contact-hero h1 {
+    margin: 0 0 10px;
+    font-size: clamp(1.65rem, 4vw, 2rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+}
+
+.contact-hero p {
+    margin: 0 auto;
+    max-width: 420px;
+    font-size: 1rem;
+    line-height: 1.55;
+    color: #cbd5e1;
+}
+
+.contact-form-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 28px 26px 26px;
+    box-shadow:
+        0 25px 50px -12px rgba(15, 23, 42, 0.18),
+        0 0 0 1px rgba(15, 23, 42, 0.06);
+}
+
+.contact-form-card h2 {
+    margin: 0 0 6px;
+    font-size: 1.125rem;
+    color: #0f172a;
+}
+
+.contact-form-lead {
+    margin: 0 0 22px;
+    font-size: 0.9rem;
+    color: #64748b;
+    line-height: 1.45;
+}
+
+.contact-field {
+    margin-bottom: 18px;
+}
+
+.contact-field label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 6px;
+}
+
+.contact-field .req {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+.contact-field input,
+.contact-field select,
+.contact-field textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 0.9375rem;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #0f172a;
+    font-family: inherit;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.contact-field input:focus,
+.contact-field select:focus,
+.contact-field textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.contact-field textarea {
+    min-height: 140px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
+.contact-submit-row {
+    margin-top: 8px;
+}
+
+.contact-submit {
+    width: 100%;
+    padding: 14px 18px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.contact-submit:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(37, 99, 235, 0.4);
+}
+
+.contact-submit:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.contact-submit:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.contact-footer-links {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 0.875rem;
+    color: #64748b;
+}
+
+.contact-footer-links a {
+    color: #2563eb;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.contact-footer-links a:hover {
+    text-decoration: underline;
+}
+
+.contact-footer-links .sep {
+    margin: 0 8px;
+    color: #cbd5e1;
+}
+
+@media (max-width: 480px) {
+    .contact-form-card {
+        padding: 22px 18px 20px;
+        border-radius: 16px;
+    }
+}
+
+/* Toasts — match main app (script.js / style.css) */
+.toast-container {
+    position: fixed;
+    top: max(16px, env(safe-area-inset-top));
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    transform: translateX(-50%);
+    z-index: 10050;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: max-content;
+    max-width: min(340px, calc(100vw - 32px));
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    padding: 12px 12px;
+    box-sizing: border-box;
+    border-radius: 12px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    box-shadow:
+        0 10px 40px rgba(15, 23, 42, 0.12),
+        0 0 0 1px rgba(15, 23, 42, 0.06);
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.toast.toast--visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast.toast--out {
+    opacity: 0;
+    transform: translateY(-6px);
+}
+
+.toast-icon {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toast-icon svg {
+    display: block;
+    width: 22px;
+    height: 22px;
+}
+
+.toast-message {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.toast-dismiss {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    margin: -4px -6px -4px 0;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.toast-dismiss:hover {
+    background: rgba(15, 23, 42, 0.06);
+    color: #475569;
+}
+
+.toast--success {
+    border-left: 4px solid #10b981;
+}
+
+.toast--success .toast-icon {
+    color: #059669;
+}
+
+.toast--error {
+    border-left: 4px solid #ef4444;
+}
+
+.toast--error .toast-icon {
+    color: #dc2626;
+}
+
+.toast--warning {
+    border-left: 4px solid #f59e0b;
+}
+
+.toast--warning .toast-icon {
+    color: #d97706;
+}
+
+.toast--info {
+    border-left: 4px solid #3b82f6;
+}
+
+.toast--info .toast-icon {
+    color: #2563eb;
+}
+
+.toast--loading {
+    border-left: 4px solid #3b82f6;
+}
+
+.toast--loading .toast-icon {
+    color: #2563eb;
+}
+
+.toast-icon--spinner {
+    margin-top: 0;
+}
+
+.toast-icon--spinner .toast-spinner {
+    display: block;
+    width: 20px;
+    height: 20px;
+    animation: toastSpinnerRotate 0.75s linear infinite;
+}
+
+.toast-icon--spinner .toast-spinner circle {
+    transform-origin: center;
+}
+
+@keyframes toastSpinnerRotate {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 480px) {
+    .toast-container {
+        max-width: min(200px, calc(100vw - max(32px, env(safe-area-inset-left) + env(safe-area-inset-right))));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .toast {
+        transition: none;
+    }
+
+    .toast.toast--visible,
+    .toast.toast--out {
+        transform: none;
+    }
+
+    .toast-icon--spinner .toast-spinner {
+        animation: none;
+    }
+}

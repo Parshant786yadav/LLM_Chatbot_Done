@@ -28,7 +28,9 @@ import random
 # from email.mime.multipart import MIMEMultipart
 # from email.utils import formataddr
 import asyncio
+import html
 import json
+from datetime import date
 from rag import cosine_similarity
 
 from database import get_supabase
@@ -37,6 +39,8 @@ from schema_ensure import (
     try_ensure_user_api_keys_table,
     is_missing_user_api_keys_table_error,
     detail_table_missing_help,
+    try_ensure_contact_submissions_table,
+    detail_contact_table_missing_help,
 )
 
 
@@ -217,6 +221,343 @@ app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=_TEMPLATES_DIR)
 
 
+def _public_base_url(request: Request) -> str:
+    """Canonical origin for SEO (sitemap, meta tags). Set PUBLIC_SITE_URL in production."""
+    explicit = (os.getenv("PUBLIC_SITE_URL") or os.getenv("SITE_URL") or "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    u = request.base_url
+    return f"{u.scheme}://{u.netloc}".rstrip("/")
+
+
+def _index_structured_data_json(base: str) -> str:
+    home = f"{base}/"
+    og_image = f"{base}/static/bot-avtar.png?v=1"
+    graph = [
+        {
+            "@type": "WebSite",
+            "@id": f"{home}#website",
+            "name": "DocuMind",
+            "alternateName": ["Documind", "Docu Mind", "documind"],
+            "url": home,
+            "description": "AI PDF chat and document assistant — upload PDFs, ask questions, get answers from your files. RAG-powered chat for personal and company documents.",
+            "inLanguage": "en",
+            "publisher": {
+                "@type": "Person",
+                "name": "Parshant Yadav",
+                "url": "https://parshantyadav.com",
+                "sameAs": [
+                    "https://www.linkedin.com/in/parshant786",
+                    "https://parshantyadav.com",
+                ],
+            },
+        },
+        {
+            "@type": "SoftwareApplication",
+            "name": "DocuMind",
+            "url": home,
+            "image": og_image,
+            "operatingSystem": "Any",
+            "applicationCategory": "BusinessApplication",
+            "applicationSubCategory": "DocumentManagementApplication",
+            "description": "Chat with PDFs using AI. DocuMind is an AI document chatbot: upload PDFs, ask questions in natural language, and get instant answers grounded in your documents (RAG).",
+            "keywords": "DocuMind, AI PDF chat, chat with PDF, AI document assistant, RAG, document Q&A",
+            "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+            "author": {
+                "@type": "Person",
+                "name": "Parshant Yadav",
+                "url": "https://parshantyadav.com",
+                "sameAs": [
+                    "https://www.linkedin.com/in/parshant786",
+                    "https://parshantyadav.com",
+                ],
+            },
+        },
+        {
+            "@type": "Blog",
+            "@id": f"{base}/blog#blog",
+            "name": "DocuMind guides",
+            "url": f"{base}/blog",
+            "description": "Guides on AI PDF chat, RAG, and getting better answers from your documents with DocuMind.",
+            "isPartOf": {"@id": f"{home}#website"},
+        },
+    ]
+    return json.dumps({"@context": "https://schema.org", "@graph": graph}, ensure_ascii=False)
+
+
+def _how_it_works_structured_data_json(base: str) -> str:
+    page_url = f"{base}/how-it-works"
+    home = f"{base}/"
+    graph = [
+        {
+            "@type": "WebPage",
+            "@id": f"{page_url}#webpage",
+            "name": "How DocuMind works — AI PDF chat & RAG",
+            "description": "How DocuMind uses retrieval (RAG) to answer from your PDFs, personal vs company mode, and the HTTP API for AI document chat.",
+            "url": page_url,
+            "inLanguage": "en",
+            "isPartOf": {"@type": "WebSite", "name": "DocuMind", "url": home},
+        },
+        {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Home", "item": home},
+                {"@type": "ListItem", "position": 2, "name": "How it works", "item": page_url},
+            ],
+        },
+    ]
+    return json.dumps({"@context": "https://schema.org", "@graph": graph}, ensure_ascii=False)
+
+
+def _contact_page_structured_data_json(base: str) -> str:
+    page_url = f"{base}/contact"
+    home = f"{base}/"
+    graph = [
+        {
+            "@type": "ContactPage",
+            "@id": f"{page_url}#webpage",
+            "name": "Contact DocuMind",
+            "description": "Send feedback, report issues, or ask questions about the AI PDF chat app.",
+            "url": page_url,
+            "inLanguage": "en",
+            "isPartOf": {"@type": "WebSite", "name": "DocuMind", "url": home},
+        },
+        {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Home", "item": home},
+                {"@type": "ListItem", "position": 2, "name": "Contact", "item": page_url},
+            ],
+        },
+    ]
+    return json.dumps({"@context": "https://schema.org", "@graph": graph}, ensure_ascii=False)
+
+
+# Allowed values for POST /api/contact (category field)
+CONTACT_FORM_CATEGORIES = frozenset(
+    {
+        "issue_using_app",
+        "bug_report",
+        "feature_request",
+        "account_login",
+        "api_technical",
+        "billing",
+        "partnership_press",
+        "other",
+    }
+)
+
+CONTACT_CATEGORY_LABELS: dict[str, str] = {
+    "issue_using_app": "Issue using the app",
+    "bug_report": "Something is broken (bug)",
+    "feature_request": "Feature request",
+    "account_login": "Account / login / OTP",
+    "api_technical": "API / embeddings / technical",
+    "billing": "Billing or limits",
+    "partnership_press": "Partnership or press",
+    "other": "Other",
+}
+
+
+class ContactFormRequest(BaseModel):
+    name: str
+    email: str
+    category: str
+    message: str
+
+
+# Sitemap URL entries: (path, priority, changefreq) — path "" is home
+_SITEMAP_CORE_ENTRIES: List[tuple[str, str, str]] = [
+    ("", "1.0", "daily"),
+    ("/how-it-works", "0.95", "weekly"),
+    ("/contact", "0.88", "monthly"),
+]
+
+_SITEMAP_BLOG_ENTRIES: List[tuple[str, str, str]] = [
+    ("/blog", "0.9", "weekly"),
+    ("/blog/what-is-ai-pdf-chat", "0.85", "monthly"),
+    ("/blog/tips-better-answers-from-pdfs", "0.85", "monthly"),
+    ("/blog/company-knowledge-base-with-ai", "0.85", "monthly"),
+]
+
+
+def _build_urlset_xml(base: str, entries: List[tuple[str, str, str]]) -> str:
+    today = date.today().isoformat()
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for path, priority, changefreq in entries:
+        loc = f"{base}/" if not path else f"{base}{path}"
+        parts.append("  <url>")
+        parts.append(f"    <loc>{loc}</loc>")
+        parts.append(f"    <lastmod>{today}</lastmod>")
+        parts.append(f"    <changefreq>{changefreq}</changefreq>")
+        parts.append(f"    <priority>{priority}</priority>")
+        parts.append("  </url>")
+    parts.append("</urlset>")
+    return "\n".join(parts) + "\n"
+
+
+def _blog_index_structured_data_json(base: str) -> str:
+    blog = f"{base}/blog"
+    posts = [
+        {
+            "@type": "BlogPosting",
+            "headline": "What is AI PDF chat? RAG in plain language",
+            "url": f"{base}/blog/what-is-ai-pdf-chat",
+            "description": "How retrieval-augmented generation powers tools like DocuMind when you chat with a PDF.",
+        },
+        {
+            "@type": "BlogPosting",
+            "headline": "Tips for better answers when you chat with your PDF",
+            "url": f"{base}/blog/tips-better-answers-from-pdfs",
+            "description": "Practical ways to upload, scope, and phrase questions for AI document assistants.",
+        },
+        {
+            "@type": "BlogPosting",
+            "headline": "Company knowledge bases and AI document chat",
+            "url": f"{base}/blog/company-knowledge-base-with-ai",
+            "description": "Shared PDF libraries, HR uploads, and team Q&A with DocuMind.",
+        },
+    ]
+    home = f"{base}/"
+    graph = [
+        {
+            "@type": "Blog",
+            "@id": f"{blog}#blog",
+            "name": "DocuMind guides",
+            "url": blog,
+            "description": "Guides on AI PDF chat, RAG, DocuMind features, and company document workflows.",
+            "publisher": {
+                "@type": "Person",
+                "name": "Parshant Yadav",
+                "url": "https://parshantyadav.com",
+                "sameAs": [
+                    "https://www.linkedin.com/in/parshant786",
+                    "https://parshantyadav.com",
+                ],
+            },
+            "blogPost": posts,
+            "isPartOf": {"@type": "WebSite", "name": "DocuMind", "url": home},
+        },
+        {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Home", "item": home},
+                {"@type": "ListItem", "position": 2, "name": "Blog & guides", "item": blog},
+            ],
+        },
+    ]
+    return json.dumps({"@context": "https://schema.org", "@graph": graph}, ensure_ascii=False)
+
+
+def _blog_post_structured_data_json(
+    base: str, path: str, headline: str, description: str, date_published: str
+) -> str:
+    url = f"{base}{path}"
+    home = f"{base}/"
+    blog_url = f"{base}/blog"
+    graph = [
+        {
+            "@type": "BlogPosting",
+            "headline": headline,
+            "description": description,
+            "url": url,
+            "datePublished": date_published,
+            "dateModified": date_published,
+            "author": {
+                "@type": "Person",
+                "name": "Parshant Yadav",
+                "url": "https://parshantyadav.com",
+                "sameAs": [
+                    "https://www.linkedin.com/in/parshant786",
+                    "https://parshantyadav.com",
+                ],
+            },
+            "publisher": {
+                "@type": "Organization",
+                "name": "DocuMind",
+                "url": home,
+            },
+            "mainEntityOfPage": {"@type": "WebPage", "@id": url},
+            "inLanguage": "en",
+        },
+        {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Home", "item": home},
+                {"@type": "ListItem", "position": 2, "name": "Blog", "item": blog_url},
+                {"@type": "ListItem", "position": 3, "name": headline, "item": url},
+            ],
+        },
+    ]
+    return json.dumps({"@context": "https://schema.org", "@graph": graph}, ensure_ascii=False)
+
+
+@app.get("/robots.txt", response_class=Response)
+def robots_txt(request: Request):
+    base = _public_base_url(request)
+    # Allow HTML/marketing pages; discourage crawling of app/API URLs (saves crawl budget).
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /admin/\n"
+        "Disallow: /api/\n"
+        "Disallow: /auth/\n"
+        "Disallow: /upload\n"
+        "Disallow: /chats/\n"
+        "Disallow: /messages/\n"
+        "Disallow: /documents/\n"
+        "Disallow: /api-keys/\n"
+        "Disallow: /user-info\n"
+        "Disallow: /company/\n"
+        "Disallow: /login/\n"
+        "\n"
+        f"Sitemap: {base}/sitemap.xml\n"
+    )
+    return Response(content=body, media_type="text/plain; charset=utf-8")
+
+
+@app.get("/sitemap.xml", response_class=Response)
+def sitemap_index_xml(request: Request):
+    """Sitemap index: points to core pages and blog sitemaps (split for clarity and future growth)."""
+    base = _public_base_url(request)
+    today = date.today().isoformat()
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        "  <sitemap>",
+        f"    <loc>{base}/sitemap-core.xml</loc>",
+        f"    <lastmod>{today}</lastmod>",
+        "  </sitemap>",
+        "  <sitemap>",
+        f"    <loc>{base}/sitemap-blog.xml</loc>",
+        f"    <lastmod>{today}</lastmod>",
+        "  </sitemap>",
+        "</sitemapindex>",
+    ]
+    return Response(content="\n".join(parts) + "\n", media_type="application/xml; charset=utf-8")
+
+
+@app.get("/sitemap-core.xml", response_class=Response)
+def sitemap_core_xml(request: Request):
+    base = _public_base_url(request)
+    return Response(
+        content=_build_urlset_xml(base, _SITEMAP_CORE_ENTRIES),
+        media_type="application/xml; charset=utf-8",
+    )
+
+
+@app.get("/sitemap-blog.xml", response_class=Response)
+def sitemap_blog_xml(request: Request):
+    base = _public_base_url(request)
+    return Response(
+        content=_build_urlset_xml(base, _SITEMAP_BLOG_ENTRIES),
+        media_type="application/xml; charset=utf-8",
+    )
+
+
 # @app.get("/", response_class=HTMLResponse)
 # def home(request: Request):
 #     return templates.TemplateResponse("index.html", {"request": request})
@@ -224,14 +565,160 @@ templates = Jinja2Templates(directory=_TEMPLATES_DIR)
 def home(request: Request):
     if request.method == "HEAD":
         return Response(status_code=200)
-    return templates.TemplateResponse(request=request, name="index.html")
+    base = _public_base_url(request)
+    ctx = {
+        "request": request,
+        "public_base_url": base,
+        "canonical_url": f"{base}/",
+        "structured_data_json": _index_structured_data_json(base),
+    }
+    return templates.TemplateResponse(request=request, name="index.html", context=ctx)
 
 
 @app.api_route("/how-it-works", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def how_it_works(request: Request):
     if request.method == "HEAD":
         return Response(status_code=200)
-    return templates.TemplateResponse(request=request, name="how-it-works.html")
+    base = _public_base_url(request)
+    ctx = {
+        "request": request,
+        "public_base_url": base,
+        "canonical_url": f"{base}/how-it-works",
+        "structured_data_json": _how_it_works_structured_data_json(base),
+    }
+    return templates.TemplateResponse(request=request, name="how-it-works.html", context=ctx)
+
+
+@app.api_route("/contact", methods=["GET", "HEAD"], response_class=HTMLResponse)
+def contact_page(request: Request):
+    if request.method == "HEAD":
+        return Response(status_code=200)
+    base = _public_base_url(request)
+    ctx = {
+        "request": request,
+        "public_base_url": base,
+        "canonical_url": f"{base}/contact",
+        "structured_data_json": _contact_page_structured_data_json(base),
+    }
+    return templates.TemplateResponse(request=request, name="contact.html", context=ctx)
+
+
+@app.post("/api/contact")
+def api_contact_submit(body: ContactFormRequest):
+    """Public contact form — saves to contact_submissions for admins (Database tab)."""
+    name = (body.name or "").strip()
+    email = (body.email or "").strip().lower()
+    category = (body.category or "").strip()
+    message = (body.message or "").strip()
+    if len(name) < 2 or len(name) > 120:
+        raise HTTPException(status_code=400, detail="Name must be between 2 and 120 characters.")
+    if "@" not in email or len(email) > 254:
+        raise HTTPException(status_code=400, detail="Valid email required.")
+    if category not in CONTACT_FORM_CATEGORIES:
+        raise HTTPException(status_code=400, detail="Invalid category.")
+    if len(message) < 10 or len(message) > 8000:
+        raise HTTPException(status_code=400, detail="Message must be between 10 and 8000 characters.")
+    if not try_ensure_contact_submissions_table():
+        raise HTTPException(status_code=503, detail=detail_contact_table_missing_help())
+    try:
+        row = db_ops.insert_contact_submission(
+            name=name,
+            email=email,
+            category=category,
+            message=message,
+        )
+    except Exception as e:
+        print(f"[CONTACT] insert failed: {e}", flush=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not save your message. Please try again later.",
+        ) from e
+    sub_id = row.get("id") if isinstance(row.get("id"), int) else None
+    _try_send_contact_admin_email(
+        submission_id=sub_id,
+        name=name,
+        email=email,
+        category=category,
+        message=message,
+    )
+    return {"ok": True, "id": row.get("id")}
+
+
+@app.api_route("/blog", methods=["GET", "HEAD"], response_class=HTMLResponse)
+def blog_index(request: Request):
+    if request.method == "HEAD":
+        return Response(status_code=200)
+    base = _public_base_url(request)
+    ctx = {
+        "request": request,
+        "public_base_url": base,
+        "canonical_url": f"{base}/blog",
+        "structured_data_json": _blog_index_structured_data_json(base),
+    }
+    return templates.TemplateResponse(request=request, name="blog/index.html", context=ctx)
+
+
+@app.api_route("/blog/what-is-ai-pdf-chat", methods=["GET", "HEAD"], response_class=HTMLResponse)
+def blog_what_is_ai_pdf_chat(request: Request):
+    if request.method == "HEAD":
+        return Response(status_code=200)
+    base = _public_base_url(request)
+    path = "/blog/what-is-ai-pdf-chat"
+    ctx = {
+        "request": request,
+        "public_base_url": base,
+        "canonical_url": f"{base}{path}",
+        "structured_data_json": _blog_post_structured_data_json(
+            base,
+            path,
+            "What is AI PDF chat? RAG in plain language",
+            "How retrieval-augmented generation powers DocuMind when you chat with a PDF, and how it differs from generic chatbots.",
+            "2025-10-15",
+        ),
+    }
+    return templates.TemplateResponse(request=request, name="blog/what-is-ai-pdf-chat.html", context=ctx)
+
+
+@app.api_route("/blog/tips-better-answers-from-pdfs", methods=["GET", "HEAD"], response_class=HTMLResponse)
+def blog_tips_pdfs(request: Request):
+    if request.method == "HEAD":
+        return Response(status_code=200)
+    base = _public_base_url(request)
+    path = "/blog/tips-better-answers-from-pdfs"
+    ctx = {
+        "request": request,
+        "public_base_url": base,
+        "canonical_url": f"{base}{path}",
+        "structured_data_json": _blog_post_structured_data_json(
+            base,
+            path,
+            "Tips for better answers when you chat with your PDF",
+            "Upload strategy, scoping documents to a chat, and phrasing questions for AI document assistants like DocuMind.",
+            "2025-10-22",
+        ),
+    }
+    return templates.TemplateResponse(request=request, name="blog/tips-better-answers-from-pdfs.html", context=ctx)
+
+
+@app.api_route("/blog/company-knowledge-base-with-ai", methods=["GET", "HEAD"], response_class=HTMLResponse)
+def blog_company_kb(request: Request):
+    if request.method == "HEAD":
+        return Response(status_code=200)
+    base = _public_base_url(request)
+    path = "/blog/company-knowledge-base-with-ai"
+    ctx = {
+        "request": request,
+        "public_base_url": base,
+        "canonical_url": f"{base}{path}",
+        "structured_data_json": _blog_post_structured_data_json(
+            base,
+            path,
+            "Company knowledge bases and AI document chat",
+            "How teams use shared PDF libraries and HR-led uploads with DocuMind for internal Q&A.",
+            "2025-11-01",
+        ),
+    }
+    return templates.TemplateResponse(request=request, name="blog/company-knowledge-base-with-ai.html", context=ctx)
 
 
 @app.on_event("startup")
@@ -255,6 +742,17 @@ async def startup():
             )
     except Exception as e:
         print(f"[API_KEYS] Startup ensure failed (non-fatal): {e}", flush=True)
+    try:
+        if try_ensure_contact_submissions_table():
+            print("[CONTACT] contact_submissions table is available.", flush=True)
+        else:
+            print(
+                "[CONTACT] contact_submissions not available yet. "
+                "Run supabase_migration_contact_submissions.sql or set DATABASE_URL for auto-create.",
+                flush=True,
+            )
+    except Exception as e:
+        print(f"[CONTACT] Startup ensure failed (non-fatal): {e}", flush=True)
     # Start background cache cleanup task
     asyncio.create_task(_cache_cleanup_task())
 
@@ -390,35 +888,21 @@ def _resolve_resend_from() -> str:
     return raw
 
 
-def _send_otp_email(to_email: str, otp: str) -> None:
-    """Send OTP via Resend API (works on Render - no SMTP needed)."""
+def _resend_send_html_email(from_email: str, to_list: List[str], subject: str, html_body: str) -> None:
+    """POST one HTML email via Resend (shared by OTP and contact notifications)."""
     import urllib.request, urllib.error, json as _json
+
     api_key = os.getenv("RESEND_API_KEY", "").strip()
     if not api_key:
         raise ValueError("RESEND_API_KEY must be set in environment")
-    from_email = _resolve_resend_from()
-    if "onboarding@resend.dev" in from_email or "@resend.dev" in from_email:
-        print(
-            "[OTP] WARNING: Using Resend sandbox sender. Set RESEND_FROM_ADDRESS=noreply@yourdomain.com "
-            "or RESEND_FROM_EMAIL on a verified domain to mail arbitrary recipients.",
-            flush=True,
-        )
-    print(f"[OTP] Sending from: {from_email}", flush=True)
-    payload = _json.dumps({
-        "from": from_email,
-        "to": [to_email],
-        "subject": "OTP From DocuMind",
-        "html": f"""
-        <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px;">
-            <h2>Your One-Time Password from DocuMind</h2>
-            <p>Your OTP is:</p>
-            <h1 style="color:#2563eb;letter-spacing:4px;">{otp}</h1>
-            <p>It expires in <strong>10 minutes</strong>.</p>
-            <p>If you didn't request this, please ignore this email.</p>
-            <p>DocuMind Team</p>
-        </div>"""
-    }).encode()
-    # Resend returns 403 error code 1010 if User-Agent is missing (common with urllib on some hosts).
+    payload = _json.dumps(
+        {
+            "from": from_email,
+            "to": to_list,
+            "subject": subject,
+            "html": html_body,
+        }
+    ).encode()
     req = urllib.request.Request(
         "https://api.resend.com/emails",
         data=payload,
@@ -430,12 +914,85 @@ def _send_otp_email(to_email: str, otp: str) -> None:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             resp.read()
     except urllib.error.HTTPError as e:
         body = e.read().decode()
-        print(f"[OTP] Resend error {e.code}: {body}", flush=True)
-        raise ValueError(f"Resend API error: {body}")
+        print(f"[Resend] HTTP {e.code}: {body}", flush=True)
+        raise ValueError(f"Resend API error: {body}") from e
+
+
+def _send_otp_email(to_email: str, otp: str) -> None:
+    """Send OTP via Resend API (works on Render - no SMTP needed)."""
+    from_email = _resolve_resend_from()
+    if "onboarding@resend.dev" in from_email or "@resend.dev" in from_email:
+        print(
+            "[OTP] WARNING: Using Resend sandbox sender. Set RESEND_FROM_ADDRESS=noreply@yourdomain.com "
+            "or RESEND_FROM_EMAIL on a verified domain to mail arbitrary recipients.",
+            flush=True,
+        )
+    print(f"[OTP] Sending from: {from_email}", flush=True)
+    html_body = f"""
+        <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px;">
+            <h2>Your One-Time Password from DocuMind</h2>
+            <p>Your OTP is:</p>
+            <h1 style="color:#2563eb;letter-spacing:4px;">{html.escape(otp)}</h1>
+            <p>It expires in <strong>10 minutes</strong>.</p>
+            <p>If you didn't request this, please ignore this email.</p>
+            <p>DocuMind Team</p>
+        </div>"""
+    _resend_send_html_email(from_email, [to_email], "OTP From DocuMind", html_body)
+
+
+def _resolve_contact_form_from_email() -> str:
+    """From-address for contact-form admin notifications (verify domain in Resend)."""
+    full = (os.getenv("CONTACT_RESEND_FROM") or "").strip()
+    if full:
+        return full
+    name = (os.getenv("CONTACT_RESEND_FROM_NAME") or "DocuMind").strip() or "DocuMind"
+    addr = (os.getenv("CONTACT_RESEND_FROM_ADDRESS") or "noreply@parshantyadav.com").strip()
+    return f"{name} <{addr}>"
+
+
+def _try_send_contact_admin_email(
+    *,
+    submission_id: Optional[int],
+    name: str,
+    email: str,
+    category: str,
+    message: str,
+) -> None:
+    """Notify site owner via Resend; failures are logged only (submission already saved)."""
+    notify_to = (os.getenv("CONTACT_NOTIFY_EMAIL") or "parshant786yadav@gmail.com").strip()
+    if not notify_to or "@" not in notify_to:
+        print("[CONTACT] CONTACT_NOTIFY_EMAIL unset or invalid; skipping owner email.", flush=True)
+        return
+    from_email = _resolve_contact_form_from_email()
+    label = CONTACT_CATEGORY_LABELS.get(category, category)
+    safe_name = html.escape(name)
+    safe_email = html.escape(email)
+    safe_label = html.escape(label)
+    safe_message = html.escape(message).replace("\n", "<br>\n")
+    sid = submission_id if submission_id is not None else "—"
+    mail_subject = f"[DocuMind contact] {label} — {name}".replace("\n", " ").strip()[:200]
+    html_body = f"""
+<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:600px;margin:0;padding:24px;">
+  <h2 style="margin:0 0 16px;color:#0f172a;">New contact form message</h2>
+  <table style="width:100%;border-collapse:collapse;font-size:15px;color:#334155;">
+    <tr><td style="padding:8px 0;font-weight:600;width:120px;">Submission ID</td><td>{html.escape(str(sid))}</td></tr>
+    <tr><td style="padding:8px 0;font-weight:600;">Category</td><td>{safe_label}</td></tr>
+    <tr><td style="padding:8px 0;font-weight:600;">Name</td><td>{safe_name}</td></tr>
+    <tr><td style="padding:8px 0;font-weight:600;">Email</td><td><a href="mailto:{safe_email}">{safe_email}</a></td></tr>
+  </table>
+  <p style="margin:20px 0 8px;font-weight:600;color:#0f172a;">Message</p>
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;line-height:1.5;">{safe_message}</div>
+  <p style="margin-top:24px;font-size:13px;color:#64748b;">Reply directly to the sender using their email above.</p>
+</div>"""
+    try:
+        _resend_send_html_email(from_email, [notify_to], mail_subject, html_body)
+        print(f"[CONTACT] Notified {notify_to} for submission id={sid}", flush=True)
+    except Exception as e:
+        print(f"[CONTACT] Owner notification email failed (saved in DB): {e}", flush=True)
 
 
 def _otp_cleanup_expired():
@@ -1643,6 +2200,10 @@ def get_admin_database(email: str = ""):
         api_keys = db_ops.get_all_user_api_keys()
     except Exception:
         api_keys = []
+    try:
+        contact_rows = db_ops.get_all_contact_submissions()
+    except Exception:
+        contact_rows = []
     return {
         "users": db_ops.get_all_users(),
         "chats": db_ops.get_all_chats(),
@@ -1650,6 +2211,7 @@ def get_admin_database(email: str = ""):
         "documents": db_ops.get_all_documents(),
         "document_chunks": db_ops.get_all_document_chunks(),
         "user_api_keys": api_keys,
+        "contact_submissions": contact_rows,
     }
 
 

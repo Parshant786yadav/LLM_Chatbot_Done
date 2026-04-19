@@ -87,7 +87,19 @@ select,
     transform: scale(0.98);
 }
 
-/* Help link under profile divider (before DocuMind title) */
+/* Help + blog links under profile (before DocuMind title) */
+.sidebar-top-links {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin: 14px 0 10px;
+}
+
+.sidebar-top-links .sidebar-how-link {
+    margin: 0;
+}
+
 .sidebar-how-link {
     display: block;
     text-align: center;
@@ -1034,6 +1046,113 @@ select,
     font-size: 0.9375rem;
     color: #64748b;
     line-height: 1.4;
+}
+
+/* Crawlable intro copy for search engines (visible, not keyword-hidden) */
+.site-seo-footer {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex-shrink: 0;
+    padding: 12px 20px 20px;
+    max-width: 52rem;
+    margin: 0 auto;
+    border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.site-seo-footer-copy {
+    flex: 1;
+    min-width: 0;
+}
+
+.site-seo-footer-text {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: #64748b;
+}
+
+.site-seo-footer-text--mobile {
+    display: none;
+}
+
+.site-seo-footer-text--mobile .site-seo-footer-mobile-line1 {
+    display: block;
+}
+
+.site-seo-footer-text--mobile .site-seo-footer-mobile-line2 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.15rem 0.5rem;
+    margin-top: 0.2em;
+}
+
+.site-seo-footer-mobile-line2-lead {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.site-seo-footer-mobile-line2-links {
+    flex: 0 0 auto;
+    margin-left: auto;
+    text-align: right;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .site-seo-footer {
+        padding: 8px 12px 12px;
+        gap: 6px;
+    }
+
+    .site-seo-footer-text--desktop {
+        display: none;
+    }
+
+    .site-seo-footer-text--mobile {
+        display: block;
+        font-size: 0.75rem;
+        line-height: 1.35;
+    }
+
+    .site-seo-footer-close {
+        margin-top: -2px;
+    }
+}
+
+.site-seo-footer-close {
+    flex-shrink: 0;
+    margin: -4px -6px 0 0;
+    padding: 4px 10px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 1.35rem;
+    line-height: 1.1;
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+.site-seo-footer-close:hover {
+    color: #475569;
+    background: rgba(15, 23, 42, 0.06);
+}
+
+.site-seo-footer-close:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+
+.site-seo-footer a {
+    color: #2563eb;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.site-seo-footer a:hover {
+    color: #1d4ed8;
 }
 
 /* Header: same at start and after — chat name left, Chat Documents right (like 2nd SS) */
@@ -2810,43 +2929,67 @@ select,
 
 .api-keys-actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
     align-items: center;
     margin-bottom: 0.35rem;
 }
 
-.api-keys-input {
-    flex: 1;
-    min-width: 120px;
-    max-width: 200px;
-    padding: 0.35rem 0.5rem;
-    font-size: 0.8rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
+.api-keys-contact-wrap {
+    text-align: center;
+    margin: 10px 0 4px;
 }
 
-.api-keys-btn {
-    padding: 0.35rem 0.65rem;
-    font-size: 0.75rem;
-    border-radius: 6px;
+.api-keys-contact-wrap .sidebar-how-link {
+    margin: 0;
+    display: inline-block;
+}
+
+.api-keys-input {
+    flex: 1;
+    min-width: 0;
+    width: 0;
+    max-width: none;
+    padding: 0.28rem 0.45rem;
+    font-size: 0.72rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    line-height: 1.25;
+}
+
+.api-keys-actions .api-keys-btn {
+    flex-shrink: 0;
+    margin: 0; /* override .sidebar button margin so row aligns with input */
+    padding: 0.28rem 0.55rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+    border-radius: 8px;
     border: none;
     background: #2563eb;
     color: #fff;
     cursor: pointer;
+    white-space: nowrap;
+    align-self: stretch;
+    min-height: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
 }
 
-.api-keys-btn:hover {
+.api-keys-actions .api-keys-btn:hover {
     background: #1d4ed8;
 }
 
-.api-keys-btn--ghost {
+.api-keys-actions .api-keys-btn--ghost {
     background: #f1f5f9;
     color: #334155;
     border: 1px solid #cbd5e1;
 }
 
-.api-keys-btn--ghost:hover {
+.api-keys-actions .api-keys-btn--ghost:hover {
     background: #e2e8f0;
 }
 

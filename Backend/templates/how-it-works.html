@@ -3,16 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>How it works? — DocuMind</title>
+    <meta name="theme-color" content="#1f2937">
+    <meta name="description" content="How DocuMind works: AI PDF chat with RAG, personal vs company documents, global and per-chat uploads, and the HTTP API for AI document Q&amp;A.">
+    <meta name="keywords" content="DocuMind, AI PDF chat, RAG, chat with PDF, document API, how DocuMind works">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="{{ canonical_url }}">
+
+    <meta property="og:title" content="How DocuMind works — AI PDF chat &amp; RAG">
+    <meta property="og:description" content="Retrieval from your PDFs, workspaces, company mode, and REST API for AI document chat.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:site_name" content="DocuMind">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+    <meta property="og:image:alt" content="DocuMind — how it works">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="How DocuMind works">
+    <meta name="twitter:description" content="RAG, PDF uploads, API — how the AI document assistant works.">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+
+    <script type="application/ld+json">{{ structured_data_json | safe }}</script>
+    <title>How DocuMind works — AI PDF chat, RAG &amp; API | DocuMind</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
-    <link rel="stylesheet" href="/static/how-it-works.css?v=1">
+    <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
+    <link rel="stylesheet" href="/static/how-it-works.css?v=2">
 </head>
 <body class="how-page">
 
-<nav class="how-nav">
-    <span class="how-nav-brand">DocuMind</span>
-    <a href="/">← Back to chat</a>
-</nav>
+{% include "blog/_nav.html" %}
 
 <main class="how-wrap">
     <h1>How it works?</h1>
@@ -215,6 +234,20 @@
         <div class="how-note">
             <strong>CORS:</strong> If you call the API from a browser on another domain, your DocuMind server must allow that origin (FastAPI middleware / reverse proxy). From a server-side app, CORS does not apply.
         </div>
+    </section>
+
+    <section class="how-card how-card--related" aria-labelledby="related-reading-heading">
+        <h2 id="related-reading-heading">Related reading</h2>
+        <p class="how-lead" style="margin-bottom: 12px;">
+            Guides on <strong>AI PDF chat</strong>, RAG, and team workflows—linked for easy discovery from this page.
+        </p>
+        <ul class="how-related-list">
+            <li><a href="/contact">Contact</a></li>
+            <li><a href="/blog">Blog &amp; guides — overview</a></li>
+            <li><a href="/blog/what-is-ai-pdf-chat">What is AI PDF chat? RAG in plain language</a></li>
+            <li><a href="/blog/tips-better-answers-from-pdfs">Tips for better answers when you chat with your PDF</a></li>
+            <li><a href="/blog/company-knowledge-base-with-ai">Company knowledge bases and AI document chat</a></li>
+        </ul>
     </section>
 </main>
 

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="description" content="What is AI PDF chat? Learn how RAG (retrieval-augmented generation) lets tools like DocuMind answer from your uploaded PDFs instead of guessing.">
+    <meta name="keywords" content="AI PDF chat, RAG, chat with PDF, DocuMind, retrieval-augmented generation, AI document assistant">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
+
+    <meta property="og:title" content="What is AI PDF chat? RAG in plain language | DocuMind">
+    <meta property="og:description" content="How DocuMind matches your questions to your PDFs using retrieval-augmented generation.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:site_name" content="DocuMind">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+    <meta property="og:image:alt" content="DocuMind — AI PDF chat guide">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="What is AI PDF chat?">
+    <meta name="twitter:description" content="RAG explained: answers grounded in your documents.">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+
+    <script type="application/ld+json">{{ structured_data_json | safe }}</script>
+    <title>What is AI PDF chat? RAG in plain language | DocuMind blog</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
+    <link rel="stylesheet" href="/static/how-it-works.css?v=2">
+</head>
+<body class="how-page">
+
+{% include "blog/_nav.html" %}
+
+<main class="how-wrap blog-article">
+    <article>
+        <header>
+            <p class="blog-article-kicker"><a href="/blog">← Blog</a></p>
+            <h1>What is AI PDF chat? RAG in plain language</h1>
+            <p class="blog-article-meta">Updated for DocuMind · <time datetime="2025-10-15">October 15, 2025</time></p>
+        </header>
+
+        <p>
+            <strong>AI PDF chat</strong> means you upload a PDF (or many), type a question in normal language, and get an answer that is supposed to reflect <em>what is actually written</em> in those files.
+            Products like <a href="/">DocuMind</a> are built for that workflow—not for open-ended trivia that ignores your documents.
+        </p>
+
+        <h2>Why not just use a normal chatbot?</h2>
+        <p>
+            A general-purpose model can sound confident while inventing details. For contracts, policies, research papers, or internal runbooks, that behavior is unacceptable.
+            The usual fix is <strong>retrieval-augmented generation</strong>, often shortened to <strong>RAG</strong>.
+        </p>
+
+        <h2>How RAG works (simplified)</h2>
+        <ol class="blog-article-ol">
+            <li><strong>Extract text</strong> from your PDFs (and, when needed, use OCR on pages that are mostly images).</li>
+            <li><strong>Chunk and index</strong> the text so the system can search by meaning, not only exact keywords.</li>
+            <li>When you ask a question, the app <strong>retrieves</strong> the small set of passages that best match your question.</li>
+            <li>The model <strong>generates</strong> an answer using those passages as its primary evidence—so the reply stays tied to your material.</li>
+        </ol>
+
+        <p>
+            That last step is why people say they “<strong>chat with a PDF</strong>”: the interface feels like chat, but the backend is closer to search plus careful summarization.
+        </p>
+
+        <h2>What you should expect in practice</h2>
+        <p>
+            RAG improves grounding, but it is not magic. If the answer is not in the document, the system should admit uncertainty rather than fabricate.
+            Quality also depends on how you <a href="/blog/tips-better-answers-from-pdfs">upload and phrase questions</a>—we wrote a separate guide on that.
+        </p>
+
+        <p class="blog-article-outro">
+            Ready to try it? <a href="/">Open DocuMind</a> ·
+            <a href="/how-it-works">Technical overview: how it works</a> ·
+            <a href="/blog">More guides</a>
+        </p>
+    </article>
+</main>
+</body>
+</html>

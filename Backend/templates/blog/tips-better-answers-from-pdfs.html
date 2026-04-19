@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="description" content="Get better answers from AI PDF chat: document scope, uploads, and question phrasing for DocuMind and similar RAG tools.">
+    <meta name="keywords" content="chat with PDF, AI document assistant, DocuMind tips, RAG, PDF Q&amp;A, ask PDF questions">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
+
+    <meta property="og:title" content="Tips for better answers when you chat with your PDF | DocuMind">
+    <meta property="og:description" content="Upload strategy and prompting tips for AI document chat.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:site_name" content="DocuMind">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+    <meta property="og:image:alt" content="DocuMind — tips for PDF chat">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Tips: better PDF chat answers">
+    <meta name="twitter:description" content="Scope, uploads, and phrasing for DocuMind.">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+
+    <script type="application/ld+json">{{ structured_data_json | safe }}</script>
+    <title>Tips for better answers when you chat with your PDF | DocuMind blog</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
+    <link rel="stylesheet" href="/static/how-it-works.css?v=2">
+</head>
+<body class="how-page">
+
+{% include "blog/_nav.html" %}
+
+<main class="how-wrap blog-article">
+    <article>
+        <header>
+            <p class="blog-article-kicker"><a href="/blog">← Blog</a></p>
+            <h1>Tips for better answers when you chat with your PDF</h1>
+            <p class="blog-article-meta">Updated for DocuMind · <time datetime="2025-10-22">October 22, 2025</time></p>
+        </header>
+
+        <p>
+            If you use an <strong>AI document assistant</strong> such as <a href="/">DocuMind</a>, small changes in how you upload and ask questions often produce much clearer, more grounded replies.
+            These tips assume a <a href="/blog/what-is-ai-pdf-chat">RAG-style</a> system: answers should come from your files, not from thin air.
+        </p>
+
+        <h2>1. Decide what “context” should be</h2>
+        <p>
+            Before uploading everything at once, think about what the model is allowed to use for this conversation.
+            In DocuMind you can keep <strong>global documents</strong> (account-wide reference PDFs) separate from <strong>per-chat uploads</strong> when you want tighter scope.
+            Narrower scope usually means fewer irrelevant chunks retrieved—and fewer mixed signals in the answer.
+        </p>
+
+        <h2>2. Prefer clean, text-selectable PDFs</h2>
+        <p>
+            Search and retrieval work best when the PDF contains real text. Scanned pages can still work when OCR runs, but results vary with scan quality.
+            If something critical is unreadable to you on screen, assume retrieval may miss nuances there too.
+        </p>
+
+        <h2>3. Ask concrete questions</h2>
+        <p>
+            Compare “Summarize the policy” with “What is the notice period for voluntary resignation in section 4?”
+            The second question steers retrieval toward a specific region of meaning and tends to produce verifiable answers you can click back to in the source PDF.
+        </p>
+
+        <h2>4. Iterate instead of stuffing</h2>
+        <p>
+            If the first answer is vague, follow up with a constraint: time period, role, region, or “quote the sentence that supports this.”
+            Good <strong>AI PDF chat</strong> is often a short dialogue, not a single megaprompt.
+        </p>
+
+        <h2>5. Teams: align on a source of truth</h2>
+        <p>
+            For org-wide use, see our guide on <a href="/blog/company-knowledge-base-with-ai">company knowledge bases and AI document chat</a>—shared libraries and HR-led uploads reduce duplicate or conflicting versions floating around.
+        </p>
+
+        <p class="blog-article-outro">
+            <a href="/">Try DocuMind</a> ·
+            <a href="/how-it-works">API &amp; product details</a> ·
+            <a href="/blog">All guides</a>
+        </p>
+    </article>
+</main>
+</body>
+</html>

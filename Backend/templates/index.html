@@ -1,35 +1,32 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="description" content="DocuMind - The ultimate AI Document Chatbot. Upload PDFs and let AI answer your questions instantly based on your documents. Built by Parshant Yadav.">
-    <meta name="keywords" content="AI Chatbot, PDF Reader AI, Document Assistant, DocuMind, Parshant Yadav, Machine Learning, Chat with PDF, AI Document Tool">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="description" content="DocuMind — AI PDF chat and AI document assistant. Upload PDFs, ask questions in plain English, get answers from your files (RAG). Chat with PDFs for work or study. By Parshant Yadav.">
+    <meta name="keywords" content="DocuMind, Documind, AI PDF chat, chat with PDF, AI document assistant, RAG, document Q&amp;A, PDF AI, ask PDF questions, Parshant Yadav">
     <meta name="author" content="Parshant Yadav">
-    <meta name="robots" content="index, follow">
-    
-    <!-- Open Graph for sharing on Social Media -->
-    <meta property="og:title" content="DocuMind - Your Personal AI Document Assistant">
-    <meta property="og:description" content="Chat instantly with your PDFs and documents. Let AI extract insights and answer questions for you on DocuMind.">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
+
+    <meta property="og:title" content="DocuMind — AI PDF chat &amp; document assistant">
+    <meta property="og:description" content="Upload PDFs and chat with your documents. DocuMind answers from your files using AI — personal workspace and company mode.">
     <meta property="og:type" content="website">
-    
-    <!-- Structured Data (JSON-LD) for Google Search -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "DocuMind",
-      "operatingSystem": "WebBrowser",
-      "applicationCategory": "ProductivityApplication",
-      "description": "An AI-powered document chatbot that lets users upload PDFs and ask questions to get context-aware answers instantly.",
-      "author": {
-        "@type": "Person",
-        "name": "Parshant Yadav",
-        "url": "https://parshantyadav.com"
-      }
-    }
-    </script>
-    <title>DocuMind - AI Document Chatbot & PDF Assistant</title>
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:site_name" content="DocuMind">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+    <meta property="og:image:alt" content="DocuMind — AI document chat">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="DocuMind — AI PDF chat">
+    <meta name="twitter:description" content="Chat with your PDFs. AI answers from your uploaded documents.">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+
+    <script type="application/ld+json">{{ structured_data_json | safe }}</script>
+    <title>DocuMind — AI PDF chat, chat with PDF &amp; AI document assistant</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=4">
     <link rel="stylesheet" href="../static/style.css">
@@ -74,7 +71,9 @@
             </div>
         </div>
 
-        <a href="/how-it-works" class="sidebar-how-link">How it works?</a>
+        <div class="sidebar-top-links">
+            <a href="/how-it-works" class="sidebar-how-link">How it works?</a>
+        </div>
 
         <h3>DocuMind</h3>
         <button onclick="createChat()">+ New Chat</button>
@@ -118,7 +117,9 @@
                     <div class="api-keys-actions">
                         <input type="text" id="globalApiKeyLabel" class="api-keys-input" placeholder="nickname (optional)" maxlength="80">
                         <button type="button" class="api-keys-btn" id="globalApiKeyCreateBtn" onclick="createGlobalApiKey()">Create key</button>
-                        <button type="button" class="api-keys-btn api-keys-btn--ghost" onclick="refreshApiKeys()">Refresh list</button>
+                    </div>
+                    <div class="api-keys-contact-wrap">
+                        <a href="/contact" class="sidebar-how-link">Contact us</a>
                     </div>
                     <p id="globalApiKeyReveal" class="api-keys-reveal" style="display: none;" aria-live="polite"></p>
                     <ul id="globalApiKeysList" class="api-keys-list"></ul>
@@ -143,7 +144,7 @@
                         </span>
                     </button>
                     <div class="chat-header-brand">
-                        <img src="/static/bot-avtar.png?v=1" alt="" class="chat-header-logo" width="32" height="32">
+                        <img src="/static/bot-avtar.png?v=1" alt="DocuMind" class="chat-header-logo" width="32" height="32">
                         <h3 id="chatTitle">DocuMind</h3>
                     </div>
                     <div id="chatDocsPanel" class="chat-docs-panel">
@@ -188,6 +189,13 @@
                     <button type="button" onclick="sendMessage()">Send</button>
                 </div>
                 <div class="start-spacer" aria-hidden="true"></div>
+                <footer class="site-seo-footer" id="siteSeoFooter" role="contentinfo">
+                    <div class="site-seo-footer-copy">
+                        <p class="site-seo-footer-text site-seo-footer-text--desktop"><strong>DocuMind</strong> is an <strong>AI PDF chat</strong> app: upload PDFs, ask questions, and get answers from your documents (retrieval-augmented generation). Use it as an <strong>AI document assistant</strong> for policies, manuals, research papers, and team knowledge. Read the <a href="/blog">blog &amp; guides</a> or <a href="/contact">contact</a>.</p>
+                        <p class="site-seo-footer-text site-seo-footer-text--mobile"><span class="site-seo-footer-mobile-line1"><strong>DocuMind</strong> — <strong>AI PDF chat</strong> &amp; <strong>AI document assistant</strong>.</span><span class="site-seo-footer-mobile-line2"><span class="site-seo-footer-mobile-line2-lead">Answers from your PDFs (RAG). Read the</span><span class="site-seo-footer-mobile-line2-links"><a href="/blog">Blog &amp; guides</a></span></span></p>
+                    </div>
+                    <button type="button" class="site-seo-footer-close" id="siteSeoFooterClose" aria-label="Hide this message" title="Hide">×</button>
+                </footer>
             </div>
         </div>
         </div>
@@ -217,6 +225,7 @@
                     <button type="button" class="db-tab" data-table="documents">Documents</button>
                     <button type="button" class="db-tab" data-table="document_chunks">Document chunks</button>
                     <button type="button" class="db-tab" data-table="user_api_keys">API keys</button>
+                    <button type="button" class="db-tab" data-table="contact_submissions">Contact form</button>
                 </div>
                 <div id="dbTableContent" class="db-table-content"></div>
             </div>
@@ -232,7 +241,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
         <div class="login-popup-hero">
-            <img src="/static/bot-avtar.png?v=1" alt="" class="login-popup-logo-img" width="40" height="40">
+            <img src="/static/bot-avtar.png?v=1" alt="DocuMind" class="login-popup-logo-img" width="40" height="40">
             <h2 id="loginPopupHeading" class="login-popup-brand-title">DocuMind</h2>
             <p class="login-popup-brand-line">Sign in to continue to your workspace</p>
         </div>

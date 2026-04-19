@@ -126,3 +126,113 @@ def detail_table_missing_help() -> str:
         "(2) Set SUPABASE_DB_URL or DATABASE_URL (Postgres connection string from Supabase Project Settings → Database) "
         "on your server and install psycopg2-binary, then redeploy so the table is created automatically."
     )
+
+
+# ---------- contact_submissions (public /contact form) ----------
+_contact_table_verified: bool = False
+
+
+def is_missing_contact_submissions_table_error(err_str: str) -> bool:
+    s = (err_str or "").lower()
+    return (
+        "contact_submissions" in s
+        or "pgrst205" in s
+        or "does not exist" in s
+        or "schema cache" in s
+    )
+
+
+def _run_contact_submissions_ddl(conn) -> None:
+    stmts = [
+        """
+CREATE TABLE IF NOT EXISTS contact_submissions (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  category TEXT NOT NULL,
+  message TEXT NOT NULL
+)
+""".strip(),
+        "CREATE INDEX IF NOT EXISTS idx_contact_submissions_created_at ON contact_submissions (created_at DESC)",
+        "ALTER TABLE contact_submissions DROP COLUMN IF EXISTS subject",
+    ]
+    cur = conn.cursor()
+    try:
+        for stmt in stmts:
+            cur.execute(stmt)
+        try:
+            cur.execute("NOTIFY pgrst, 'reload schema'")
+        except Exception:
+            pass
+    finally:
+        cur.close()
+
+
+def migrate_contact_submissions_via_postgres() -> bool:
+    db_url = (
+        (os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL") or os.getenv("SUPABASE_POSTGRES_URL") or "")
+        .strip()
+    )
+    if not db_url:
+        return False
+    try:
+        import psycopg2
+    except ImportError:
+        print(
+            "[CONTACT] Install psycopg2-binary for automatic contact_submissions table from DATABASE_URL.",
+            flush=True,
+        )
+        return False
+    try:
+        conn = psycopg2.connect(db_url)
+        conn.autocommit = True
+        _run_contact_submissions_ddl(conn)
+        conn.close()
+        print("[CONTACT] Ensured contact_submissions table via Postgres.", flush=True)
+        return True
+    except Exception as e:
+        print(f"[CONTACT] Postgres DDL failed: {e}", flush=True)
+        return False
+
+
+def try_ensure_contact_submissions_table(*, reset: bool = False) -> bool:
+    global _contact_table_verified
+    if reset:
+        _contact_table_verified = False
+    if _contact_table_verified:
+        return True
+
+    from database import get_supabase
+
+    try:
+        get_supabase().table("contact_submissions").select("id").limit(1).execute()
+        _contact_table_verified = True
+        return True
+    except Exception as e:
+        if not is_missing_contact_submissions_table_error(str(e)):
+            raise
+
+    if migrate_contact_submissions_via_postgres():
+        import time
+
+        for i in range(5):
+            try:
+                get_supabase().table("contact_submissions").select("id").limit(1).execute()
+                _contact_table_verified = True
+                return True
+            except Exception as e2:
+                if i < 4 and is_missing_contact_submissions_table_error(str(e2)):
+                    time.sleep(0.4)
+                    continue
+                print(f"[CONTACT] PostgREST still cannot see contact_submissions: {e2}", flush=True)
+                return False
+
+    return False
+
+
+def detail_contact_table_missing_help() -> str:
+    return (
+        "Table contact_submissions is missing. Run Backend/supabase_migration_contact_submissions.sql in the "
+        "Supabase SQL Editor, or set SUPABASE_DB_URL / DATABASE_URL for automatic creation on startup."
+    )

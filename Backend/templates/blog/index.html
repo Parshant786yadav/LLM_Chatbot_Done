@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="description" content="DocuMind blog and guides: AI PDF chat, RAG, tips for chatting with documents, and company knowledge bases.">
+    <meta name="keywords" content="DocuMind, AI PDF chat, chat with PDF, RAG guides, AI document assistant, Documind">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
+
+    <meta property="og:title" content="DocuMind blog — AI PDF chat &amp; document guides">
+    <meta property="og:description" content="Guides on RAG, PDF Q&amp;A, and using DocuMind for personal and team documents.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:site_name" content="DocuMind">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+    <meta property="og:image:alt" content="DocuMind blog">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="DocuMind blog">
+    <meta name="twitter:description" content="AI PDF chat guides and tips for DocuMind.">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+
+    <script type="application/ld+json">{{ structured_data_json | safe }}</script>
+    <title>DocuMind blog — AI PDF chat, RAG &amp; document guides</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
+    <link rel="stylesheet" href="/static/how-it-works.css?v=2">
+</head>
+<body class="how-page">
+
+{% include "blog/_nav.html" %}
+
+<main class="how-wrap">
+    <h1>Blog &amp; guides</h1>
+    <p class="how-lead">
+        Practical articles on <strong>AI PDF chat</strong>, <strong>retrieval-augmented generation (RAG)</strong>, and getting the most from <a href="/">DocuMind</a>.
+        For product behavior and API details, see <a href="/how-it-works">how it works</a>.
+        <a href="/contact">Contact</a> for feedback or partnerships.
+    </p>
+
+    <ul class="blog-index-list">
+        <li class="blog-index-card">
+            <a class="blog-index-card-link" href="/blog/what-is-ai-pdf-chat">
+                <span class="blog-index-card-title">What is AI PDF chat? RAG in plain language</span>
+                <span class="blog-index-card-desc">How your questions are matched to passages in uploaded PDFs—and why that beats a generic chatbot for document work.</span>
+            </a>
+        </li>
+        <li class="blog-index-card">
+            <a class="blog-index-card-link" href="/blog/tips-better-answers-from-pdfs">
+                <span class="blog-index-card-title">Tips for better answers when you chat with your PDF</span>
+                <span class="blog-index-card-desc">Upload scope, chat-specific files, and how to phrase questions for clearer, grounded replies.</span>
+            </a>
+        </li>
+        <li class="blog-index-card">
+            <a class="blog-index-card-link" href="/blog/company-knowledge-base-with-ai">
+                <span class="blog-index-card-title">Company knowledge bases and AI document chat</span>
+                <span class="blog-index-card-desc">Shared libraries, HR-led uploads, and team Q&amp;A patterns with DocuMind.</span>
+            </a>
+        </li>
+    </ul>
+</main>
+</body>
+</html>
