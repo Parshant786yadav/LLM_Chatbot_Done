@@ -1152,6 +1152,8 @@ class ChatRequest(BaseModel):
     chat: Optional[str] = None
     message: str
     voice: Optional[bool] = False  # True when message came from live voice mode (saves wrapped «…» so history is identifiable)
+    # Web voice pill language (en-US / hi-IN): steers reply language when STT language differs from UI choice.
+    voice_ui_lang: Optional[str] = None
 
 
 _VOICE_OPEN = "\u00ab"   # «
@@ -1781,12 +1783,33 @@ _SYSTEM_INSTRUCTION_API_KEY = (
 )
 
 
+def _voice_ui_lang_clause(locale: str | None) -> str:
+    """Extra instruction when the web app voice bar selects English vs Hindi output."""
+    if not locale or not str(locale).strip():
+        return ""
+    loc = str(locale).strip().lower()
+    if loc.startswith("en"):
+        return (
+            "\n\nVoice UI language (mandatory for this turn): The app voice bar is set to English. "
+            "Write the entire reply in natural English using Latin script only — headings, explanations, and lists included. "
+            "Do not answer in Devanagari Hindi or Roman Hindi unless you are quoting a short phrase verbatim from an uploaded document; "
+            "if you quote non-English, immediately translate or gloss it in English.\n"
+        )
+    if loc.startswith("hi"):
+        return (
+            "\n\nVoice UI language: The user selected Hindi voice mode. "
+            "Prefer Hindi (Devanagari) or natural Hinglish for this reply when appropriate.\n"
+        )
+    return ""
+
+
 def _docmind_system_final_prompt(
     chunks: list,
     message: str,
     rag_user_contents: list[str],
     *,
     api_key_compact: bool = False,
+    voice_ui_lang: str | None = None,
 ) -> tuple[str, str]:
     """Embedding + chunk scoring; returns (system_instruction, final_user_prompt) for Groq."""
     rag_query_parts = rag_user_contents[-10:] if rag_user_contents else [(message or "").strip()]
@@ -1811,6 +1834,7 @@ def _docmind_system_final_prompt(
 
     system_instruction = _SYSTEM_INSTRUCTION_API_KEY if api_key_compact else _SYSTEM_INSTRUCTION_WEB
     has_any_chunks = bool(chunks)
+    voice_clause = _voice_ui_lang_clause(voice_ui_lang)
     if context.strip():
         final_prompt = (
             "Relevant context from the user's uploaded documents:\n\n"
@@ -1829,6 +1853,7 @@ def _docmind_system_final_prompt(
             "Do not add it for short, simple answers.\n"
             "6. If the answer isn't in the context, say you couldn't find it in the uploaded documents and "
             "suggest uploading a document with that info.\n\n"
+            f"{voice_clause}"
             f"User: {message}"
         )
     else:
@@ -1858,6 +1883,7 @@ def _docmind_system_final_prompt(
             "- requests for code/debugging, math problems, long translations, essays, stories, poems, advice, recipes;\n"
             "- anything that turns you into a general-purpose ChatGPT-like tool.\n\n"
             "Never invent facts. Never claim to browse the internet.\n\n"
+            f"{voice_clause}"
             f"User: {message}"
         )
     return system_instruction, final_prompt
@@ -1870,13 +1896,14 @@ def _docmind_reply_from_rag(
     rag_user_contents: list[str],
     *,
     api_key_compact: bool = False,
+    voice_ui_lang: str | None = None,
 ) -> dict:
     """Build RAG context from chunks and return {\"reply\": str}. Uses global Groq client."""
     if not client:
         return {"reply": "GROQ_API_KEY not found in .env"}
 
     system_instruction, final_prompt = _docmind_system_final_prompt(
-        chunks, message, rag_user_contents, api_key_compact=api_key_compact
+        chunks, message, rag_user_contents, api_key_compact=api_key_compact, voice_ui_lang=voice_ui_lang
     )
 
     reply = None
@@ -1954,7 +1981,10 @@ def _chat_sync(req: ChatRequest):
             chunks = db_ops.get_document_chunks_personal(user["id"], chat["id"])
 
         rag_users = _rag_user_contents_for_query(history_messages, req.message, history_user_contents)
-        result = _docmind_reply_from_rag(chunks, req.message, history_messages, rag_users)
+        vul = getattr(req, "voice_ui_lang", None) if is_voice else None
+        result = _docmind_reply_from_rag(
+            chunks, req.message, history_messages, rag_users, voice_ui_lang=vul
+        )
         reply_text = result["reply"]
         saved_reply = _wrap_voice(reply_text) if is_voice else reply_text
         db_ops.add_message(chat["id"], "model", saved_reply, user.get("display_id"))
@@ -1997,8 +2027,9 @@ def _chat_stream_generator(req: ChatRequest) -> Iterator[bytes]:
             chunks = db_ops.get_document_chunks_personal(user["id"], chat["id"])
 
         rag_users = _rag_user_contents_for_query(history_messages, req.message, history_user_contents)
+        vul = getattr(req, "voice_ui_lang", None) if is_voice else None
         system_instruction, final_prompt = _docmind_system_final_prompt(
-            chunks, req.message, rag_users, api_key_compact=False
+            chunks, req.message, rag_users, api_key_compact=False, voice_ui_lang=vul
         )
         messages = _build_groq_messages(system_instruction, history_messages, final_prompt)
         full: list[str] = []
