@@ -2998,7 +2998,10 @@ window.VoiceMode = (function () {
         recognition.onresult = function (e) {
             var interim = "";
             lastFinal = "";
-            for (var i = e.resultIndex; i < e.results.length; i++) {
+            // Sum finals from ALL segments — not only from resultIndex. Hindi (hi-IN) often
+            // emits multiple finals across events; newer events may start at resultIndex > 0,
+            // and skipping earlier indices leaves lastFinal empty on onend → no submit / no reply.
+            for (var i = 0; i < e.results.length; i++) {
                 var r = e.results[i];
                 if (r.isFinal) lastFinal += r[0].transcript;
                 else interim += r[0].transcript;
