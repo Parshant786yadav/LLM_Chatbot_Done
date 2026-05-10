@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="description" content="DocuMind REST API optional voice: true field. Same Bearer key, same RAG—add «marked» transcript strings for voice UIs. Compare to normal API and streaming SSE.">
+    <meta name="keywords" content="DocuMind API, voice API, REST API document chat, Bearer token, speech integration, RAG API, PDF Q&amp;A API, optional voice parameter">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
+
+    <meta property="og:title" content="DocuMind API voice mode — optional voice flag | DocuMind blog">
+    <meta property="og:description" content="Optional voice: true on POST /api/v1/chat and /api/v1/chat/stream for transcript styling aligned with the web app.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:site_name" content="DocuMind">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+    <meta property="og:image:alt" content="DocuMind API voice mode guide">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="DocuMind API voice mode">
+    <meta name="twitter:description" content="Optional voice flag for REST and SSE integrations.">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+
+    <script type="application/ld+json">{{ structured_data_json | safe }}</script>
+    <title>DocuMind API voice mode — optional REST flag | DocuMind blog</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
+    <link rel="stylesheet" href="/static/how-it-works.css?v=4">
+</head>
+<body class="how-page">
+
+{% include "_top_progress.html" %}
+
+{% include "blog/_nav.html" %}
+
+<main class="how-wrap blog-article">
+    <article>
+        <header>
+            <p class="blog-article-kicker"><a href="/blog">← Blog</a></p>
+            <h1>DocuMind API voice mode: optional voice flag for REST integrations</h1>
+            <p class="blog-article-meta">Updated for DocuMind · <time datetime="2026-05-10">May 10, 2026</time></p>
+        </header>
+
+        <p>
+            If you embed <a href="/">DocuMind</a> in your product with a <strong>Bearer API key</strong>, you can keep using the API exactly as before—nothing breaks when you omit this option.
+            When you add <strong><code>voice: true</code></strong> to the JSON body, responses include extra strings formatted like the web app’s voice transcripts (guillemets «…»), so your UI can match DocuMind’s chat styling when you build <strong>speech → text → answer → speech</strong> flows.
+        </p>
+
+        <h2>What stays the same</h2>
+        <ul class="blog-article-ol">
+            <li><strong>Authentication</strong> — still <code>Authorization: Bearer &lt;api_key&gt;</code>.</li>
+            <li><strong>Grounding</strong> — answers still come only from documents tied to that key (global or chat scope).</li>
+            <li><strong><code>reply</code> text</strong> — plain text suitable for <strong>text-to-speech</strong>; we do not wrap guillemets inside the main reply string.</li>
+        </ul>
+
+        <h2>What <code>voice: true</code> adds</h2>
+        <p>
+            On <code>POST /api/v1/chat</code>, when <code>voice</code> is true, the JSON may include <code>voice</code>, <code>message_marked</code>, and <code>reply_marked</code> alongside <code>reply</code>.
+            Use <code>message_marked</code> / <code>reply_marked</code> only if you want your saved chat history to mirror the in-app voice appearance.
+        </p>
+        <p>
+            On <code>POST /api/v1/chat/stream</code>, delta events are unchanged <code>{"t":"d","c":"..."}</code>.
+            The final <code>{"t":"done", ...}</code> event may include <code>voice</code>, <code>message_marked</code>, and <code>reply_marked</code> when you requested voice mode—parse the last JSON object accordingly.
+        </p>
+
+        <h2>Speech recognition and TTS</h2>
+        <p>
+            DocuMind’s HTTP API does not run speech-to-text or TTS on the server for Bearer keys—you wire those in your client (browser <strong>Web Speech API</strong>, mobile SDKs, or a cloud STT/TTS provider).
+            Send the transcribed text as <code>message</code>; speak the streamed or JSON <code>reply</code> with your chosen voice engine.
+        </p>
+
+        <p class="blog-article-outro">
+            Full reference: <a href="/how-it-works#api-voice">How it works — API &amp; optional voice</a> ·
+            <a href="/blog/voice-pdf-qa-rest-api">Voice assistant guide for developers</a> ·
+            <a href="/blog/web-speech-api-documind-api">Web Speech API + DocuMind</a>
+        </p>
+    </article>
+</main>
+</body>
+</html>

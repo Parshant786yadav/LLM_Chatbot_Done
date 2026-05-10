@@ -236,3 +236,91 @@ def detail_contact_table_missing_help() -> str:
         "Table contact_submissions is missing. Run Backend/supabase_migration_contact_submissions.sql in the "
         "Supabase SQL Editor, or set SUPABASE_DB_URL / DATABASE_URL for automatic creation on startup."
     )
+
+
+# ---------- users.display_name + users.profile_photo (profile feature) ----------
+_user_profile_cols_verified: bool = False
+
+
+def _run_user_profile_columns_ddl(conn) -> None:
+    stmts = [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo TEXT",
+    ]
+    cur = conn.cursor()
+    try:
+        for stmt in stmts:
+            cur.execute(stmt)
+        try:
+            cur.execute("NOTIFY pgrst, 'reload schema'")
+        except Exception:
+            pass
+    finally:
+        cur.close()
+
+
+def _migrate_user_profile_columns_via_postgres() -> bool:
+    db_url = (
+        (os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL") or os.getenv("SUPABASE_POSTGRES_URL") or "")
+        .strip()
+    )
+    if not db_url:
+        return False
+    try:
+        import psycopg2
+    except ImportError:
+        print("[PROFILE] Install psycopg2-binary for automatic users.display_name/profile_photo creation.", flush=True)
+        return False
+    try:
+        conn = psycopg2.connect(db_url)
+        conn.autocommit = True
+        _run_user_profile_columns_ddl(conn)
+        conn.close()
+        print("[PROFILE] Ensured users.display_name and users.profile_photo columns.", flush=True)
+        return True
+    except Exception as e:
+        print(f"[PROFILE] Postgres DDL failed: {e}", flush=True)
+        return False
+
+
+def try_ensure_user_profile_columns(*, reset: bool = False) -> bool:
+    """Make sure users table has display_name + profile_photo columns. Cached after success."""
+    global _user_profile_cols_verified
+    if reset:
+        _user_profile_cols_verified = False
+    if _user_profile_cols_verified:
+        return True
+
+    from database import get_supabase
+    try:
+        get_supabase().table("users").select("display_name,profile_photo").limit(1).execute()
+        _user_profile_cols_verified = True
+        return True
+    except Exception as e:
+        s = str(e).lower()
+        if not ("display_name" in s or "profile_photo" in s or "column" in s or "schema cache" in s or "pgrst" in s):
+            return False
+
+    if _migrate_user_profile_columns_via_postgres():
+        import time
+        for i in range(5):
+            try:
+                get_supabase().table("users").select("display_name,profile_photo").limit(1).execute()
+                _user_profile_cols_verified = True
+                return True
+            except Exception:
+                if i < 4:
+                    time.sleep(0.4)
+                    continue
+                return False
+    return False
+
+
+def detail_user_profile_columns_missing_help() -> str:
+    return (
+        "Profile fields (users.display_name, users.profile_photo) are not yet on the database. "
+        "Run these in the Supabase SQL Editor:\n"
+        "  ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT;\n"
+        "  ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo TEXT;\n"
+        "Or set SUPABASE_DB_URL / DATABASE_URL for automatic creation on startup."
+    )

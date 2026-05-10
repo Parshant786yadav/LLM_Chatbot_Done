@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#1f2937">
-    <meta name="description" content="How DocuMind works: AI PDF chat with RAG, personal vs company documents, global and per-chat uploads, and the HTTP API for AI document Q&amp;A.">
-    <meta name="keywords" content="DocuMind, AI PDF chat, RAG, chat with PDF, document API, how DocuMind works">
+    <meta name="description" content="How DocuMind works: AI PDF chat with RAG, personal vs company documents, global and per-chat uploads, and the HTTP API (optional voice: true for embeds) for AI document Q&amp;A.">
+    <meta name="keywords" content="DocuMind, AI PDF chat, RAG, chat with PDF, document API, voice API, Web Speech, how DocuMind works">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
     <link rel="canonical" href="{{ canonical_url }}">
 
@@ -27,9 +27,11 @@
     <title>How DocuMind works — AI PDF chat, RAG &amp; API | DocuMind</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
     <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
-    <link rel="stylesheet" href="/static/how-it-works.css?v=4">
+    <link rel="stylesheet" href="/static/how-it-works.css?v=5">
 </head>
 <body class="how-page">
+
+{% include "_top_progress.html" %}
 
 {% include "blog/_nav.html" %}
 
@@ -83,7 +85,9 @@
         </ul>
         <h3>Request body</h3>
         <p>
-            JSON object: <code>message</code> (string, required) and optional <code>history</code> — an array of <code>{"role":"user"|"assistant","content":"..."}</code> (up to ~120 turns). Responses are compact for API use.
+            JSON object: <code>message</code> (string, required), optional <code>history</code> — an array of <code>{"role":"user"|"assistant","content":"..."}</code> (up to ~120 turns), and optional <code>voice</code> (boolean, default <code>false</code>).
+            Set <code>"voice": true</code> when your client uses speech (or you want the same «marked» transcript style as the web app’s voice mode); omit it for normal text-only integrations.
+            Responses are compact for API use; when <code>voice</code> is true, non-streaming JSON may include <code>message_marked</code> and <code>reply_marked</code> alongside <code>reply</code>.
         </p>
 
         <h3>Non-streaming: <code>POST /api/v1/chat</code></h3>
@@ -231,6 +235,26 @@
             </div>
         </div>
 
+        <div id="api-voice" class="how-api-voice-wrap">
+            <h3 id="api-voice-heading">Optional voice mode (embeds &amp; speech UIs)</h3>
+            <p>
+                DocuMind does <strong>not</strong> run speech-to-text or text-to-speech on the API server for Bearer keys—you implement microphone input and playback in your app (browser <strong>Web Speech API</strong>, mobile SDKs, or cloud STT/TTS).
+                Send the transcribed text as <code>message</code>; read aloud the plain <code>reply</code> (or streamed deltas).
+            </p>
+            <p>
+                When you set <code>"voice": true</code> in the JSON body, the API adds optional fields so your UI can show voice-style transcripts consistent with the main web app:
+            </p>
+            <ul>
+                <li><strong>POST /api/v1/chat</strong> — same <code>reply</code> as always; may also include <code>voice</code>, <code>message_marked</code>, and <code>reply_marked</code> (guillemets «…»).</li>
+                <li><strong>POST /api/v1/chat/stream</strong> — token deltas unchanged; the final <code>{"t":"done"}</code> event may include <code>voice</code>, <code>message_marked</code>, and <code>reply_marked</code>.</li>
+            </ul>
+            <p>
+                Guides: <a href="/blog/documind-api-voice-mode">API voice mode overview</a>,
+                <a href="/blog/voice-pdf-qa-rest-api">Voice assistant for PDF Q&amp;A</a>,
+                <a href="/blog/web-speech-api-documind-api">Web Speech API + DocuMind</a>.
+            </p>
+        </div>
+
         <div class="how-note">
             <strong>CORS:</strong> If you call the API from a browser on another domain, your DocuMind server must allow that origin (FastAPI middleware / reverse proxy). From a server-side app, CORS does not apply.
         </div>
@@ -247,6 +271,9 @@
             <li><a href="/blog/what-is-ai-pdf-chat">What is AI PDF chat? RAG in plain language</a></li>
             <li><a href="/blog/tips-better-answers-from-pdfs">Tips for better answers when you chat with your PDF</a></li>
             <li><a href="/blog/company-knowledge-base-with-ai">Company knowledge bases and AI document chat</a></li>
+            <li><a href="/blog/documind-api-voice-mode">DocuMind API voice mode (optional <code>voice</code> flag)</a></li>
+            <li><a href="/blog/voice-pdf-qa-rest-api">Build a voice assistant for PDF Q&amp;A with the REST API</a></li>
+            <li><a href="/blog/web-speech-api-documind-api">Web Speech API + DocuMind API key</a></li>
         </ul>
     </section>
 </main>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="description" content="Build a team-wide document Q&amp;A bot in an afternoon: upload PDFs, create a DocuMind API key, embed in Slack/Teams or your own webapp. Includes curl, JavaScript and Python examples.">
+    <meta name="keywords" content="team document Q&amp;A bot, internal AI assistant for company docs, build company chatbot from PDFs, RAG for HR docs, DocuMind API tutorial, document chatbot REST API, internal knowledge base AI">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
+
+    <meta property="og:title" content="Build a team document Q&amp;A bot — step by step | DocuMind">
+    <meta property="og:description" content="Practical walkthrough: upload company PDFs, generate an API key, integrate Slack/Teams or your own webapp using DocuMind's Bearer API.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:site_name" content="DocuMind">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+    <meta property="og:image:alt" content="Team document Q&amp;A bot tutorial with DocuMind">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Build a team document Q&amp;A bot">
+    <meta name="twitter:description" content="curl + JS + Python examples for the DocuMind Bearer API.">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+
+    <script type="application/ld+json">{{ structured_data_json | safe }}</script>
+    <title>Build a team document Q&amp;A bot — step by step | DocuMind blog</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
+    <link rel="stylesheet" href="/static/how-it-works.css?v=5">
+</head>
+<body class="how-page">
+
+{% include "_top_progress.html" %}
+
+{% include "blog/_nav.html" %}
+
+<main class="how-wrap blog-article">
+    <article>
+        <header>
+            <p class="blog-article-kicker"><a href="/blog">← Blog</a></p>
+            <h1>Building a document Q&amp;A bot for your team — step by step</h1>
+            <p class="blog-article-meta">Updated for DocuMind · <time datetime="2026-05-10">May 10, 2026</time></p>
+        </header>
+
+        <p>
+            Every team eventually has the same question: <em>“how do we get the answers from our PDFs without HR or the lead engineer becoming a search engine?”</em>
+            This guide is a real, follow-along walkthrough for building a <strong>document Q&amp;A bot</strong> for a small team using <a href="/">DocuMind</a>.
+            You can complete it in an afternoon, it’s free for the basic flow, and the same pattern scales to a full company knowledge base.
+        </p>
+
+        <h2>What you’re building</h2>
+        <p>
+            A bot that answers questions about <strong>your team’s documents</strong> (not the open internet). When someone asks <em>“how many days of personal leave do new hires get?”</em>, the bot reads from the actual policy PDF and replies — with no risk of hallucinating policies that don’t exist.
+        </p>
+
+        <h2>Architecture, in one diagram</h2>
+        <pre class="how-snippet">[Slack / Teams / your webapp]
+        |
+        |  user question (text)
+        v
+[Your tiny backend or webhook]
+        |
+        |  POST /api/v1/chat   Authorization: Bearer YOUR_API_KEY
+        v
+[DocuMind] -- retrieves chunks from your uploaded PDFs (RAG)
+        |
+        v
+   reply text  →  back to Slack / Teams / webapp</pre>
+        <p>
+            The crucial piece: <strong>your API key controls which documents are visible</strong>. A “global” key sees all PDFs uploaded under your account; a “chat-scoped” key only sees PDFs in one specific chat.
+        </p>
+
+        <h2>Step 1 — Upload the team’s PDFs</h2>
+        <ol class="blog-article-ol">
+            <li>Go to <a href="/">documind.parshantyadav.com</a> and sign in.</li>
+            <li>Use <strong>Global Documents</strong> for org-wide PDFs (HR policy, holiday schedule, code of conduct).</li>
+            <li>If you want the bot scoped to <em>one</em> conversation, create a chat first and upload PDFs <em>inside</em> that chat.</li>
+        </ol>
+
+        <h2>Step 2 — Create an API key</h2>
+        <ol class="blog-article-ol">
+            <li>Open the sidebar → <strong>API keys (global documents)</strong> for an org-wide bot.</li>
+            <li>Or use <strong>Create API key</strong> inside a specific chat for chat-scoped retrieval.</li>
+            <li>Copy the key the moment it’s shown — it’s never displayed again.</li>
+        </ol>
+
+        <h2>Step 3 — Verify with curl</h2>
+        <pre class="how-snippet">curl -sS -X POST "https://documind.parshantyadav.com/api/v1/chat" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Summarize the leave policy in one paragraph.","history":[]}'</pre>
+        <p>You should get back a JSON <code>{"reply": "..."}</code> sourced from your uploaded PDFs. If it answers anything outside the docs, recheck the key’s scope.</p>
+
+        <h2>Step 4 — Wire it into Slack (10 lines of Node)</h2>
+        <pre class="how-snippet">// /api/slack-webhook  (Vercel / Render / your server)
+import express from "express";
+const app = express();
+app.use(express.urlencoded({ extended: true }));
+
+app.post("/api/slack-webhook", async (req, res) =&gt; {
+    const question = (req.body.text || "").trim();
+    if (!question) return res.json({ text: "Ask me something about our docs." });
+    const r = await fetch("https://documind.parshantyadav.com/api/v1/chat", {
+        method: "POST",
+        headers: {
+            Authorization: "Bearer " + process.env.DOCUMIND_KEY,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: question, history: [] }),
+    });
+    const j = await r.json();
+    res.json({ response_type: "in_channel", text: j.reply || "Sorry, no answer." });
+});
+
+app.listen(process.env.PORT || 3000);</pre>
+        <p>
+            In Slack, set this URL as a slash-command webhook (e.g. <code>/docs</code>). Now <code>/docs how many leave days do interns get?</code> answers from the actual handbook.
+        </p>
+
+        <h2>Step 5 — Streaming reply (better UX)</h2>
+        <p>
+            For a webapp, use <code>/api/v1/chat/stream</code> so the answer appears word by word. SSE deltas come as <code>{"t":"d","c":"..."}</code> followed by <code>{"t":"done"}</code>.
+            Full code samples (cURL, JS, Python) live on the <a href="/how-it-works#api">how it works</a> page.
+        </p>
+
+        <h2>Step 6 — Optional: voice for support staff</h2>
+        <p>
+            If your team is on the move (warehouse, retail, kitchen), pair the API with the browser microphone. Set <code>"voice": true</code> in the body and use Web Speech for the mic. Details: <a href="/blog/web-speech-api-documind-api">Web Speech API + DocuMind</a>.
+        </p>
+
+        <h2>Common questions</h2>
+        <h3>Can people ask things outside our PDFs?</h3>
+        <p>The system prompt strictly refuses to answer non-document questions. It’ll still handle greetings (“hi”, “thanks”) and meta-questions (“who built you”).</p>
+
+        <h3>Multiple PDFs — does it search all of them?</h3>
+        <p>Yes; retrieval pulls relevant chunks across every PDF visible to the key’s scope.</p>
+
+        <h3>Can we revoke a key?</h3>
+        <p>Yes. The same UI shows revoke buttons. Once revoked, the key returns 401 immediately.</p>
+
+        <h3>What about audit / who-asked-what?</h3>
+        <p>API requests don’t persist conversations server-side (your app keeps the history if you want one). For built-in chat history, use the regular DocuMind app accounts.</p>
+
+        <h2>Where to go next</h2>
+        <ul>
+            <li><a href="/blog/company-knowledge-base-with-ai">Company knowledge bases and AI document chat</a> — patterns for HR-led uploads.</li>
+            <li><a href="/blog/documind-api-voice-mode">Optional voice mode in the REST API</a>.</li>
+            <li><a href="/how-it-works">Full API reference and SSE format</a>.</li>
+        </ul>
+
+        <p class="blog-article-outro">
+            Build it: <a href="/">documind.parshantyadav.com</a> ·
+            More: <a href="/blog/voice-pdf-qa-rest-api">voice PDF Q&amp;A</a>,
+            <a href="/blog">all guides</a>.
+        </p>
+    </article>
+</main>
+</body>
+</html>

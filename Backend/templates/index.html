@@ -1,37 +1,82 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" itemscope itemtype="https://schema.org/SoftwareApplication">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#1f2937">
-    <meta name="description" content="DocuMind — AI PDF chat and AI document assistant. Upload PDFs, ask questions in plain English, get answers from your files (RAG). Chat with PDFs for work or study. By Parshant Yadav.">
-    <meta name="keywords" content="DocuMind, Documind, AI PDF chat, chat with PDF, AI document assistant, RAG, document Q&amp;A, PDF AI, ask PDF questions, Parshant Yadav">
+    <meta name="description" content="DocuMind AI — free AI PDF chat and AI document assistant by Parshant Yadav. Upload PDFs, ask questions in natural language, get instant answers from your files using RAG. Chat with PDF for study, work and team knowledge.">
+    <meta name="keywords" content="DocuMind, Documind, DocuMind AI, Documind AI, documind ai pdf chat, AI PDF chat, chat with PDF, AI document assistant, document chat AI, RAG, document Q&amp;A, PDF AI, ask PDF questions, Parshant Yadav, parshantyadav DocuMind">
     <meta name="author" content="Parshant Yadav">
+    <meta name="application-name" content="DocuMind">
+    <meta name="apple-mobile-web-app-title" content="DocuMind">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <meta name="bingbot" content="index, follow">
+    <meta name="rating" content="general">
+
+    {# Search engine site verification — paste your verification token from Google/Bing/Yandex (env vars optional). #}
+    {% if google_site_verification %}<meta name="google-site-verification" content="{{ google_site_verification }}">{% endif %}
+    {% if bing_site_verification %}<meta name="msvalidate.01" content="{{ bing_site_verification }}">{% endif %}
+    {% if yandex_site_verification %}<meta name="yandex-verification" content="{{ yandex_site_verification }}">{% endif %}
+
     <link rel="canonical" href="{{ canonical_url }}">
     <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
+    <link rel="alternate" hreflang="en" href="{{ canonical_url }}">
+    <link rel="manifest" href="/static/site.webmanifest" crossorigin="use-credentials" onerror="this.remove()">
 
-    <meta property="og:title" content="DocuMind — AI PDF chat &amp; document assistant">
-    <meta property="og:description" content="Upload PDFs and chat with your documents. DocuMind answers from your files using AI — personal workspace and company mode.">
+    <meta property="og:title" content="DocuMind AI — Chat with your PDFs (AI document assistant)">
+    <meta property="og:description" content="DocuMind is a free AI PDF chat. Upload PDFs and ask anything — DocuMind answers from your files using RAG. Personal workspace + company mode + REST API.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ canonical_url }}">
     <meta property="og:site_name" content="DocuMind">
     <meta property="og:locale" content="en_US">
     <meta property="og:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
     <meta property="og:image:alt" content="DocuMind — AI document chat">
+    <meta property="og:image:width" content="512">
+    <meta property="og:image:height" content="512">
 
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="DocuMind — AI PDF chat">
-    <meta name="twitter:description" content="Chat with your PDFs. AI answers from your uploaded documents.">
+    <meta name="twitter:title" content="DocuMind AI — Chat with your PDFs">
+    <meta name="twitter:description" content="DocuMind is a free AI PDF chat & AI document assistant. Upload PDFs and ask anything — answers grounded in your files (RAG).">
     <meta name="twitter:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+    <meta name="twitter:image:alt" content="DocuMind — AI document chat">
 
     <script type="application/ld+json">{{ structured_data_json | safe }}</script>
-    <title>DocuMind — AI PDF chat, chat with PDF &amp; AI document assistant</title>
+    <title>DocuMind AI — Chat with your PDFs · AI Document Assistant</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=4">
-    <link rel="stylesheet" href="../static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=2">
 </head>
 <body>
+
+<a class="seo-skip-link" href="#chatArea">Skip to DocuMind app</a>
+
+{# SEO landing block — visible to crawlers + screen readers but visually compact at top of the document. #}
+<header class="seo-landing" role="banner" aria-label="About DocuMind">
+    <span class="seo-landing-brand">
+        <meta itemprop="name" content="DocuMind">
+        <meta itemprop="alternateName" content="DocuMind AI, Documind, Documind AI">
+        <meta itemprop="applicationCategory" content="BusinessApplication">
+        <meta itemprop="operatingSystem" content="Any">
+    </span>
+    <h1 class="seo-landing-title" itemprop="headline">
+        <span itemprop="name">DocuMind AI</span> — Chat with your PDFs &amp; documents
+    </h1>
+    <p class="seo-landing-tagline" itemprop="description">
+        <strong>DocuMind</strong> (also written as <strong>Documind</strong> or <strong>DocuMind AI</strong>) is a
+        free <strong>AI PDF chat</strong> and <strong>AI document assistant</strong> by
+        <a href="https://parshantyadav.com" rel="author">Parshant Yadav</a>.
+        Upload PDFs, ask questions in natural language, and get answers grounded in your files using
+        retrieval-augmented generation (RAG) — not the open internet.
+    </p>
+    <p class="seo-landing-links">
+        <a href="/how-it-works">How it works</a> ·
+        <a href="/blog">Blog &amp; guides</a> ·
+        <a href="/blog/what-is-ai-pdf-chat">What is AI PDF chat?</a> ·
+        <a href="/blog/documind-api-voice-mode">DocuMind API voice mode</a> ·
+        <a href="/contact">Contact</a>
+    </p>
+</header>
 
 <div class="layout" id="layout">
 
@@ -59,10 +104,12 @@
                         <span class="profile-user-id-label">User ID:</span>
                         <span id="profileUserId" class="profile-user-id-value">--</span>
                     </div>
-                    <label class="profile-dropdown-item upload-label" role="menuitem">
-                        Change photo
-                        <input type="file" id="photoUpload" accept="image/*" onchange="changePhoto()" hidden>
-                    </label>
+                    <button type="button" class="profile-dropdown-item profile-open-btn" onclick="openProfileModal()" role="menuitem">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20c0-3.314 3.582-6 8-6s8 2.686 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Profile
+                    </button>
                     <button type="button" class="profile-dropdown-item profile-logout" onclick="logout()" role="menuitem">Log out</button>
                 </div>
             </div>
@@ -113,7 +160,7 @@
                 <p id="companyDocHintEmployee" class="company-doc-hint" style="display: none;">Only HR (hr@yourcompany) can upload documents. You can ask questions in chat to get details from the documents HR has uploaded.</p>
                 <div id="globalApiKeysSection" class="api-keys-section" style="display: none;">
                     <h4 class="api-keys-title">API keys (global documents)</h4>
-                    <p class="api-keys-desc">Embed in your site; answers use only documents uploaded here (global), not chat-specific files.</p>
+                    <p class="api-keys-desc">Embed in your site; answers use only documents uploaded here (global), not chat-specific files. Optional <code>voice: true</code> on the REST API for speech UIs — see <a href="/how-it-works#api-voice">how it works</a>.</p>
                     <div class="api-keys-actions">
                         <input type="text" id="globalApiKeyLabel" class="api-keys-input" placeholder="nickname (optional)" maxlength="80">
                         <button type="button" class="api-keys-btn" id="globalApiKeyCreateBtn" onclick="createGlobalApiKey()">Create key</button>
@@ -165,7 +212,7 @@
                                     <button type="button" class="chat-api-key-trigger" id="chatApiKeyPopoverBtn" onclick="toggleChatApiKeyPopover(event)" aria-expanded="false" aria-haspopup="true" aria-controls="chatApiKeyPopover" title="Create API key" aria-label="Create API key"><svg class="chat-header-btn-icon chat-header-btn-icon--key chat-header-btn-icon-desktop" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="16" r="3" stroke="currentColor" stroke-width="2"/><path d="M11 16h9M11 16l2.5-2.5M20 16v-3.5l-2-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="chat-api-key-label chat-header-label-desktop">Create API key</span><span class="chat-header-label-mobile">API key <span class="chat-header-api-emoji-mobile" aria-hidden="true">🗝️</span></span></button>
                                     <div id="chatApiKeyPopover" class="chat-api-key-popover" role="dialog" aria-labelledby="chatApiKeyPopoverHeading" aria-hidden="true">
                                         <p id="chatApiKeyPopoverHeading" class="api-keys-title">Create API key</p>
-                                        <p class="api-keys-desc">Answers only use PDFs uploaded in this chat</p>
+                                        <p class="api-keys-desc">Answers only use PDFs uploaded in this chat. Optional API field <code>voice: true</code> for voice-style transcripts — <a href="/how-it-works#api-voice">docs</a>.</p>
                                         <div class="api-keys-actions">
                                             <input type="text" id="chatApiKeyLabel" class="api-keys-input" placeholder="nickname (optional)" maxlength="80">
                                             <button type="button" class="api-keys-btn" id="chatApiKeyCreateBtn" onclick="createChatApiKey()">Create key</button>
@@ -186,6 +233,11 @@
                 <p class="start-prompt" aria-hidden="true">Ask anything about your Documents</p>
                 <div class="input-box">
                     <input id="messageInput" placeholder="Ask DocuMind …" data-placeholder-desktop="Ask DocuMind …" data-placeholder-mobile="Ask a question…">
+                    <button type="button" id="voiceModeBtn" class="voice-mode-btn" onclick="openVoiceMode()" title="Voice chat" aria-label="Voice chat">
+                        <svg class="voice-mode-btn__icon" width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path fill="#ffffff" fill-rule="evenodd" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15a.97.97 0 0 0-.98-.85c-.61 0-1.09.54-1 1.14C5.65 16.55 8.56 19 12 19s6.35-2.45 6.91-6.86c.09-.6-.39-1.14-1-1.14zM11 22h2v-2h-2v2z"/>
+                        </svg>
+                    </button>
                     <button type="button" onclick="sendMessage()">Send</button>
                 </div>
                 <div class="start-spacer" aria-hidden="true"></div>
@@ -308,6 +360,80 @@
         <div class="confirm-dialog-actions">
             <button type="button" class="confirm-dialog-btn confirm-dialog-cancel" id="confirmDialogCancel">Cancel</button>
             <button type="button" class="confirm-dialog-btn confirm-dialog-ok confirm-dialog-btn--primary" id="confirmDialogOk">Confirm</button>
+        </div>
+    </div>
+</div>
+
+{% include "_top_progress.html" %}
+
+<div id="profileModal" class="profile-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle">
+    <div class="profile-modal-backdrop" onclick="closeProfileModal()"></div>
+    <div class="profile-modal-card" role="document">
+        <button type="button" class="profile-modal-close" onclick="closeProfileModal()" aria-label="Close">×</button>
+        <h2 id="profileModalTitle" class="profile-modal-title">Profile</h2>
+
+        <div class="profile-modal-photo-wrap">
+            <img id="profileModalPhoto" class="profile-modal-photo" alt="Profile picture" src="https://api.dicebear.com/7.x/avataaars/svg?seed=default">
+            <label class="profile-modal-photo-edit" title="Change picture" aria-label="Change picture">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/>
+                </svg>
+                <input type="file" id="profileModalPhotoInput" accept="image/*" onchange="onProfilePhotoSelected()" hidden>
+            </label>
+        </div>
+
+        <div class="profile-modal-field">
+            <label class="profile-modal-label">Name</label>
+            <div class="profile-modal-name-row">
+                <span id="profileModalNameDisplay" class="profile-modal-name-display"></span>
+                <input id="profileModalNameInput" class="profile-modal-name-input" type="text" maxlength="60" style="display:none;">
+                <button type="button" id="profileModalNameEditBtn" class="profile-modal-pencil" onclick="startEditProfileName()" title="Edit name" aria-label="Edit name">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/>
+                    </svg>
+                </button>
+                <button type="button" id="profileModalNameSaveBtn" class="profile-modal-namesave" onclick="commitEditProfileName()" style="display:none;">Save</button>
+                <button type="button" id="profileModalNameCancelBtn" class="profile-modal-namecancel" onclick="cancelEditProfileName()" style="display:none;">Cancel</button>
+            </div>
+        </div>
+
+        <div class="profile-modal-field">
+            <label class="profile-modal-label">Email <span class="profile-modal-readonly">(can't be changed)</span></label>
+            <input id="profileModalEmail" class="profile-modal-input" type="email" readonly>
+        </div>
+    </div>
+</div>
+
+<div id="voiceOverlay" class="voice-overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Voice mode">
+    <button type="button" class="voice-overlay-close" id="voiceOverlayClose" onclick="closeVoiceMode()" aria-label="End voice chat">×</button>
+    <div class="voice-stage">
+        <div class="voice-orb" id="voiceOrb" data-state="idle">
+            <span class="voice-orb-ring voice-orb-ring--1" aria-hidden="true"></span>
+            <span class="voice-orb-ring voice-orb-ring--2" aria-hidden="true"></span>
+            <span class="voice-orb-ring voice-orb-ring--3" aria-hidden="true"></span>
+            <span class="voice-orb-glow" aria-hidden="true"></span>
+            <div class="voice-orb-core">
+                <img src="/static/bot-avtar.png?v=1" alt="DocuMind" class="voice-orb-logo" id="voiceOrbLogo">
+            </div>
+            <div class="voice-orb-bars" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span>
+            </div>
+        </div>
+        <h2 class="voice-status-title" id="voiceStatusTitle">DocuMind</h2>
+        <p class="voice-status-text" id="voiceStatusText">Connecting…</p>
+        <div class="voice-actions">
+            <button type="button" class="voice-action-btn voice-action-btn--mute" id="voiceMuteBtn" onclick="toggleVoiceMute()" aria-label="Mute / unmute mic">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="9" y="3" width="6" height="12" rx="3" stroke="currentColor" stroke-width="2"/>
+                    <path d="M5 11a7 7 0 0 0 14 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </button>
+            <button type="button" class="voice-action-btn voice-action-btn--end" id="voiceEndBtn" onclick="closeVoiceMode()" aria-label="End voice chat">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M6 18L18 6M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+            </button>
         </div>
     </div>
 </div>

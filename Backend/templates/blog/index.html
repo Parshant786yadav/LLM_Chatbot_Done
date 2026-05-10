@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#1f2937">
-    <meta name="description" content="DocuMind blog and guides: AI PDF chat, RAG, tips for chatting with documents, and company knowledge bases.">
-    <meta name="keywords" content="DocuMind, AI PDF chat, chat with PDF, RAG guides, AI document assistant, Documind">
+    <meta name="description" content="DocuMind blog: free ChatPDF alternatives, summarize long PDFs free, multilingual document chat, team Q&amp;A bots, student study guides, RAG and DocuMind API voice mode.">
+    <meta name="keywords" content="DocuMind, AI PDF chat, free ChatPDF alternative, summarize long PDF free, chat PDF Hindi, multilingual document chat, team document QA bot, AI study assistant PDF, RAG guides, DocuMind API voice">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
     <link rel="canonical" href="{{ canonical_url }}">
     <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
@@ -31,6 +31,8 @@
 </head>
 <body class="how-page">
 
+{% include "_top_progress.html" %}
+
 {% include "blog/_nav.html" %}
 
 <main class="how-wrap">
@@ -42,6 +44,54 @@
     </p>
 
     <ul class="blog-index-list">
+        <li class="blog-index-card">
+            <a class="blog-index-card-link" href="/blog/chatpdf-free-alternatives-2026">
+                <span class="blog-index-card-title">Free alternatives to ChatPDF — pros &amp; cons (2026)</span>
+                <span class="blog-index-card-desc">DocuMind, AskYourPDF, ChatDOC, Humata — page limits, languages, APIs, voice. Honest comparison.</span>
+            </a>
+        </li>
+        <li class="blog-index-card">
+            <a class="blog-index-card-link" href="/blog/summarize-long-pdf-with-ai-free">
+                <span class="blog-index-card-title">How to summarize a long PDF with AI for free</span>
+                <span class="blog-index-card-desc">RAG vs map-reduce vs truncation: prompts that actually work on 100+ page PDFs without hallucinating.</span>
+            </a>
+        </li>
+        <li class="blog-index-card">
+            <a class="blog-index-card-link" href="/blog/chat-with-pdf-in-your-language">
+                <span class="blog-index-card-title">Chat with PDFs in Hindi, Hinglish, Spanish &amp; more</span>
+                <span class="blog-index-card-desc">Ask in your language even when the PDF is English. Multilingual embeddings + same-language replies.</span>
+            </a>
+        </li>
+        <li class="blog-index-card">
+            <a class="blog-index-card-link" href="/blog/team-document-qa-bot-step-by-step">
+                <span class="blog-index-card-title">Build a team document Q&amp;A bot — step by step</span>
+                <span class="blog-index-card-desc">Upload PDFs, generate an API key, plug into Slack/Teams or a webapp. curl + Node + Python examples.</span>
+            </a>
+        </li>
+        <li class="blog-index-card">
+            <a class="blog-index-card-link" href="/blog/pdf-chat-for-students">
+                <span class="blog-index-card-title">PDF chat for students — ask AI about your textbooks</span>
+                <span class="blog-index-card-desc">Turn textbooks, notes and research papers into an AI study partner. Multilingual, voice-capable, free.</span>
+            </a>
+        </li>
+        <li class="blog-index-card">
+            <a class="blog-index-card-link" href="/blog/documind-api-voice-mode">
+                <span class="blog-index-card-title">DocuMind API voice mode — optional REST flag</span>
+                <span class="blog-index-card-desc">Bearer keys stay the same; add voice: true for «marked» transcripts and streaming SSE extras.</span>
+            </a>
+        </li>
+        <li class="blog-index-card">
+            <a class="blog-index-card-link" href="/blog/voice-pdf-qa-rest-api">
+                <span class="blog-index-card-title">Voice assistant for PDF Q&amp;A with the DocuMind REST API</span>
+                <span class="blog-index-card-desc">Microphone → transcript → API → speak: patterns for document-grounded voice experiences.</span>
+            </a>
+        </li>
+        <li class="blog-index-card">
+            <a class="blog-index-card-link" href="/blog/web-speech-api-documind-api">
+                <span class="blog-index-card-title">Web Speech API + DocuMind API key</span>
+                <span class="blog-index-card-desc">Browser speech-to-text with your API key; security and CORS notes for production.</span>
+            </a>
+        </li>
         <li class="blog-index-card">
             <a class="blog-index-card-link" href="/blog/what-is-ai-pdf-chat">
                 <span class="blog-index-card-title">What is AI PDF chat? RAG in plain language</span>

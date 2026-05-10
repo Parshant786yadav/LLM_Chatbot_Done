@@ -22,8 +22,36 @@ def create_user(email: str, display_id: str, user_type: str = "personal", compan
     payload = {"email": email, "display_id": display_id, "user_type": user_type or "personal"}
     if company_id is not None:
         payload["company_id"] = company_id
+    # Default display_name = first part of email (before @). User can change it later via /api/profile.
+    try:
+        local_part = (email or "").split("@", 1)[0].strip()
+        if local_part:
+            payload["display_name"] = local_part
+    except Exception:
+        pass
     r = get_supabase().table("users").insert(payload).execute()
     return r.data[0]
+
+
+def update_user_profile(
+    email: str,
+    *,
+    display_name: Optional[str] = None,
+    profile_photo: Optional[str] = None,
+) -> Optional[dict]:
+    """Update display_name and/or profile_photo for the user. Pass None to leave a field unchanged.
+    Pass an empty string for profile_photo to clear it. Returns the updated user row."""
+    if not email:
+        return None
+    patch: dict = {}
+    if display_name is not None:
+        patch["display_name"] = display_name
+    if profile_photo is not None:
+        patch["profile_photo"] = profile_photo or None
+    if not patch:
+        return get_user_by_email(email)
+    r = get_supabase().table("users").update(patch).eq("email", email).execute()
+    return _one(r.data) or get_user_by_email(email)
 
 
 def get_or_create_company(domain: str) -> Optional[dict]:

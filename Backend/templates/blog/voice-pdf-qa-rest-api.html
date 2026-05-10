@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="description" content="Build a voice assistant for PDF Q&amp;A: DocuMind REST API + optional voice flag, streaming SSE, Web Speech API microphone input, and answers grounded in uploaded documents.">
+    <meta name="keywords" content="voice PDF chat API, document Q&amp;A API, DocuMind integration, speech to text PDF, RAG voice assistant, REST API streaming, AI document API developer">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
+
+    <meta property="og:title" content="Voice assistant for PDF Q&amp;A with DocuMind REST API | DocuMind blog">
+    <meta property="og:description" content="Developer patterns: microphone → transcript → DocuMind Bearer API → speak reply. Optional voice mode for UI parity.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:site_name" content="DocuMind">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+    <meta property="og:image:alt" content="Voice PDF Q&amp;A with DocuMind API">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Voice PDF Q&amp;A REST API guide">
+    <meta name="twitter:description" content="Wire speech UI to DocuMind document-grounded answers.">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+
+    <script type="application/ld+json">{{ structured_data_json | safe }}</script>
+    <title>Voice assistant for PDF Q&amp;A with DocuMind REST API | DocuMind blog</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
+    <link rel="stylesheet" href="/static/how-it-works.css?v=4">
+</head>
+<body class="how-page">
+
+{% include "_top_progress.html" %}
+
+{% include "blog/_nav.html" %}
+
+<main class="how-wrap blog-article">
+    <article>
+        <header>
+            <p class="blog-article-kicker"><a href="/blog">← Blog</a></p>
+            <h1>Build a voice assistant for PDF Q&amp;A with the DocuMind REST API</h1>
+            <p class="blog-article-meta">Updated for DocuMind · <time datetime="2026-05-10">May 10, 2026</time></p>
+        </header>
+
+        <p>
+            Teams often want users to <strong>ask questions aloud</strong> about policies, manuals, or contracts stored as PDFs—without turning the product into a generic internet chatbot.
+            <a href="/">DocuMind</a> answers from <strong>your uploaded documents</strong> via the same <strong>RAG</strong> pipeline as the web app; you only need an <strong>API key</strong> and HTTPS calls from your backend or browser.
+        </p>
+
+        <h2>Recommended flow</h2>
+        <ol class="blog-article-ol">
+            <li><strong>Capture speech</strong> in the client (e.g. browser <code>SpeechRecognition</code> / Web Speech API).</li>
+            <li><strong>POST</strong> the transcript to <code>/api/v1/chat</code> or stream with <code>/api/v1/chat/stream</code>, header <code>Authorization: Bearer …</code>.</li>
+            <li><strong>Optional:</strong> set <code>"voice": true</code> if you want marked transcript strings for your UI (see <a href="/blog/documind-api-voice-mode">API voice mode</a>).</li>
+            <li><strong>Speak the reply</strong> with <code>speechSynthesis</code> or your preferred TTS.</li>
+        </ol>
+
+        <h2>Why optional <code>voice</code>?</h2>
+        <p>
+            Server integrations that only need JSON text can omit <code>voice</code> entirely.
+            Voice-enabled clients set <code>voice: true</code> when they want <code>message_marked</code> / <code>reply_marked</code> on the response for chat bubbles that match DocuMind’s «voice» styling—purely optional.
+        </p>
+
+        <h2>Scope your key correctly</h2>
+        <p>
+            Create a <strong>global</strong> API key for org-wide PDFs, or a <strong>chat-scoped</strong> key when retrieval should follow one conversation’s uploads.
+            Details are in <a href="/how-it-works#api">How it works — HTTP API</a>.
+        </p>
+
+        <p class="blog-article-outro">
+            Next: <a href="/blog/web-speech-api-documind-api">Web Speech API + DocuMind</a> ·
+            <a href="/how-it-works">Technical overview</a> ·
+            <a href="/">Try DocuMind</a>
+        </p>
+    </article>
+</main>
+</body>
+</html>

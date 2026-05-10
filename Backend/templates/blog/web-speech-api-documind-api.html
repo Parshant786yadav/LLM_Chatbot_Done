@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="description" content="Use the browser Web Speech API with DocuMind: microphone speech-to-text, POST /api/v1/chat with your API key, optional voice:true, and speechSynthesis for answers grounded in PDFs.">
+    <meta name="keywords" content="Web Speech API, DocuMind API key, speech to text JavaScript, document chat browser, SpeechRecognition API, fetch REST API, AI PDF voice chat">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
+
+    <meta property="og:title" content="Web Speech API + DocuMind API key | DocuMind blog">
+    <meta property="og:description" content="Connect SpeechRecognition to DocuMind document Q&amp;A with fetch and optional voice mode.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:site_name" content="DocuMind">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+    <meta property="og:image:alt" content="Web Speech API DocuMind integration">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Web Speech API + DocuMind">
+    <meta name="twitter:description" content="Speech-to-text in the browser + DocuMind REST API.">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+
+    <script type="application/ld+json">{{ structured_data_json | safe }}</script>
+    <title>Web Speech API + DocuMind API — speech-to-text for document chat | DocuMind blog</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
+    <link rel="stylesheet" href="/static/how-it-works.css?v=4">
+</head>
+<body class="how-page">
+
+{% include "_top_progress.html" %}
+
+{% include "blog/_nav.html" %}
+
+<main class="how-wrap blog-article">
+    <article>
+        <header>
+            <p class="blog-article-kicker"><a href="/blog">← Blog</a></p>
+            <h1>Web Speech API + DocuMind API: speech-to-text for document chat</h1>
+            <p class="blog-article-meta">Updated for DocuMind · <time datetime="2026-05-10">May 10, 2026</time></p>
+        </header>
+
+        <p>
+            In Chromium-based browsers, <strong>Web Speech API</strong> can turn microphone input into text without hosting your own speech models.
+            Pair it with <a href="/">DocuMind</a>’s <code>POST /api/v1/chat</code> (or streaming endpoint) so answers stay tied to <strong>PDFs behind your API key</strong>, not the open web.
+        </p>
+
+        <h2>Security note</h2>
+        <p>
+            Avoid exposing raw API keys in public front-end code for production.
+            Prefer a small backend proxy that attaches <code>Authorization: Bearer …</code>, or restrict keys and rotate them if they must live client-side during prototyping.
+        </p>
+
+        <h2>CORS</h2>
+        <p>
+            Browser <code>fetch</code> to your DocuMind origin requires CORS to allow your site’s domain—same note as <a href="/how-it-works#api">How it works — HTTP API</a>.
+        </p>
+
+        <h2>Optional <code>voice: true</code></h2>
+        <p>
+            After <code>SpeechRecognition</code> produces a string, send it as <code>message</code>.
+            Set <code>"voice": true</code> when you want the API to return marked transcript fields for UI parity; omit it for a minimal integration.
+            See <a href="/blog/documind-api-voice-mode">DocuMind API voice mode</a>.
+        </p>
+
+        <h2>Speaking the reply</h2>
+        <p>
+            Use <code>speechSynthesis</code> with the plain <code>reply</code> string from JSON or the concatenated stream deltas—same text users read on screen.
+        </p>
+
+        <p class="blog-article-outro">
+            Related: <a href="/blog/voice-pdf-qa-rest-api">Voice PDF Q&amp;A REST guide</a> ·
+            <a href="/how-it-works#api-voice">API reference — optional voice</a>
+        </p>
+    </article>
+</main>
+</body>
+</html>

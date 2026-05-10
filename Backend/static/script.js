@@ -234,37 +234,268 @@ function closeSidebar() {
     if (overlay) overlay.addEventListener("click", closeSidebar);
 })();
 
-function changePhoto() {
-    var input = document.getElementById("photoUpload");
+/* ================= PROFILE (display name + photo, server-backed) ================= */
+
+var _profileCache = { email: null, display_name: null, profile_photo: null };
+var DEFAULT_AVATAR_URL = "https://api.dicebear.com/7.x/avataaars/svg?seed=default";
+var PROFILE_LS_PREFIX = "documind_profile_v1_";
+
+/** Default display name = first part of the user's email. */
+function _defaultDisplayNameFromEmail(email) {
+    if (!email) return "User";
+    var local = String(email).split("@")[0] || "";
+    return local.trim() || "User";
+}
+
+/** Save profile to localStorage so a refresh can show it instantly (no flash to old name). */
+function _saveProfileToLocalStorage(profile) {
+    if (!profile || !profile.email) return;
+    try {
+        var key = PROFILE_LS_PREFIX + String(profile.email).toLowerCase();
+        localStorage.setItem(key, JSON.stringify({
+            email: profile.email,
+            display_name: profile.display_name || null,
+            profile_photo: profile.profile_photo || null,
+            ts: Date.now()
+        }));
+    } catch (e) { /* quota/private-mode: ignore */ }
+}
+
+/** Read cached profile for an email, returns null if not cached. */
+function _readCachedProfile(email) {
+    if (!email) return null;
+    try {
+        var key = PROFILE_LS_PREFIX + String(email).toLowerCase();
+        var raw = localStorage.getItem(key);
+        if (!raw) return null;
+        var obj = JSON.parse(raw);
+        if (!obj || !obj.email) return null;
+        return obj;
+    } catch (e) { return null; }
+}
+
+function _clearCachedProfile(email) {
+    if (!email) return;
+    try { localStorage.removeItem(PROFILE_LS_PREFIX + String(email).toLowerCase()); } catch (e) {}
+}
+
+/** Apply profile (name + photo) to the sidebar trigger and modal. */
+function applyProfileToUI(profile, opts) {
+    opts = opts || {};
+    var p = profile || {};
+    var email = p.email || userEmail || "";
+    var name = (p.display_name || "").trim() || _defaultDisplayNameFromEmail(email);
+    var photo = p.profile_photo || "";
+
+    _profileCache = { email: email, display_name: name, profile_photo: photo || null };
+
+    if (opts.persist !== false && email) {
+        _saveProfileToLocalStorage(_profileCache);
+    }
+
+    var nameEl = document.getElementById("profileName");
+    if (nameEl) {
+        nameEl.textContent = name;
+        nameEl.title = email;
+    }
+    var sidebarImg = document.getElementById("profilePhoto");
+    if (sidebarImg) sidebarImg.src = photo || DEFAULT_AVATAR_URL;
+
+    var modalImg = document.getElementById("profileModalPhoto");
+    if (modalImg) modalImg.src = photo || DEFAULT_AVATAR_URL;
+    var modalNameDisplay = document.getElementById("profileModalNameDisplay");
+    if (modalNameDisplay) modalNameDisplay.textContent = name;
+    var modalEmailEl = document.getElementById("profileModalEmail");
+    if (modalEmailEl) modalEmailEl.value = email;
+}
+
+/** Apply locally-cached profile for `email` immediately (synchronous, no flash on refresh). */
+function applyCachedProfileImmediately(email) {
+    if (!email) return false;
+    var cached = _readCachedProfile(email);
+    if (!cached) return false;
+    // Don't re-persist the same value back to localStorage.
+    applyProfileToUI(cached, { persist: false });
+    return true;
+}
+
+/** Pull latest profile from the server (fixes the photo-not-persisting bug). */
+async function refreshProfileFromServer() {
+    if (!userEmail) return;
+    try {
+        var res = await fetch(API_BASE + "/api/profile?email=" + encodeURIComponent(userEmail));
+        if (!res.ok) {
+            // Don't clobber a good cached value with a generic fallback.
+            if (!_readCachedProfile(userEmail)) {
+                applyProfileToUI({ email: userEmail });
+            }
+            return;
+        }
+        var data = await res.json();
+        applyProfileToUI(data);
+    } catch (e) {
+        console.error("Could not load profile", e);
+        if (!_readCachedProfile(userEmail)) {
+            applyProfileToUI({ email: userEmail });
+        }
+    }
+}
+
+/** Resize/compress an image File to a square JPEG data URL (≤256x256, ~85% quality). */
+function _imageFileToCompressedDataUrl(file, maxSize) {
+    maxSize = maxSize || 256;
+    return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onerror = function () { reject(new Error("Could not read image")); };
+        reader.onload = function () {
+            var img = new Image();
+            img.onerror = function () { reject(new Error("Could not load image")); };
+            img.onload = function () {
+                var w = img.naturalWidth || img.width;
+                var h = img.naturalHeight || img.height;
+                if (!w || !h) { reject(new Error("Invalid image")); return; }
+                var side = Math.min(w, h);
+                var sx = (w - side) / 2;
+                var sy = (h - side) / 2;
+                var canvas = document.createElement("canvas");
+                canvas.width = maxSize;
+                canvas.height = maxSize;
+                var ctx = canvas.getContext("2d");
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = "high";
+                ctx.drawImage(img, sx, sy, side, side, 0, 0, maxSize, maxSize);
+                try {
+                    var url = canvas.toDataURL("image/jpeg", 0.85);
+                    resolve(url);
+                } catch (err) { reject(err); }
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+async function _patchProfile(payload) {
+    var body = Object.assign({ email: userEmail }, payload || {});
+    var res = await fetch(API_BASE + "/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+    });
+    var data = await res.json().catch(function () { return {}; });
+    if (!res.ok) {
+        var msg = (data && (typeof data.detail === "string" ? data.detail : (data.detail && data.detail.msg))) || "Could not update profile";
+        throw new Error(msg);
+    }
+    return data;
+}
+
+/** Open the profile modal and refresh data from server. */
+async function openProfileModal() {
+    if (!userEmail) {
+        toast("Please sign in first.", "info");
+        return;
+    }
+    closeProfileDropdown();
+    var modal = document.getElementById("profileModal");
+    if (!modal) return;
+    modal.classList.add("is-open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    cancelEditProfileName();
+    applyProfileToUI(_profileCache.email === userEmail ? _profileCache : { email: userEmail });
+    refreshProfileFromServer();
+}
+
+function closeProfileModal() {
+    var modal = document.getElementById("profileModal");
+    if (!modal) return;
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    cancelEditProfileName();
+}
+
+function startEditProfileName() {
+    var disp = document.getElementById("profileModalNameDisplay");
+    var inp = document.getElementById("profileModalNameInput");
+    var saveBtn = document.getElementById("profileModalNameSaveBtn");
+    var cancelBtn = document.getElementById("profileModalNameCancelBtn");
+    var editBtn = document.getElementById("profileModalNameEditBtn");
+    if (!disp || !inp || !saveBtn || !cancelBtn || !editBtn) return;
+    inp.value = disp.textContent || "";
+    disp.style.display = "none";
+    editBtn.style.display = "none";
+    inp.style.display = "inline-block";
+    saveBtn.style.display = "inline-flex";
+    cancelBtn.style.display = "inline-flex";
+    inp.focus();
+    inp.select();
+    inp.onkeydown = function (e) {
+        if (e.key === "Enter") { e.preventDefault(); commitEditProfileName(); }
+        else if (e.key === "Escape") { e.preventDefault(); cancelEditProfileName(); }
+    };
+}
+
+function cancelEditProfileName() {
+    var disp = document.getElementById("profileModalNameDisplay");
+    var inp = document.getElementById("profileModalNameInput");
+    var saveBtn = document.getElementById("profileModalNameSaveBtn");
+    var cancelBtn = document.getElementById("profileModalNameCancelBtn");
+    var editBtn = document.getElementById("profileModalNameEditBtn");
+    if (disp) disp.style.display = "";
+    if (editBtn) editBtn.style.display = "";
+    if (inp) inp.style.display = "none";
+    if (saveBtn) saveBtn.style.display = "none";
+    if (cancelBtn) cancelBtn.style.display = "none";
+}
+
+async function commitEditProfileName() {
+    var inp = document.getElementById("profileModalNameInput");
+    var saveBtn = document.getElementById("profileModalNameSaveBtn");
+    if (!inp) return;
+    var newName = (inp.value || "").trim();
+    if (!newName) { toast("Name can't be empty.", "warning"); return; }
+    if (newName.length > 60) { toast("Name is too long (max 60 chars).", "warning"); return; }
+    if (newName === (_profileCache.display_name || "")) {
+        cancelEditProfileName();
+        return;
+    }
+    if (saveBtn) saveBtn.disabled = true;
+    try {
+        var data = await _patchProfile({ display_name: newName });
+        applyProfileToUI(data);
+        cancelEditProfileName();
+        toast("Name updated.", "success");
+    } catch (e) {
+        toast(e.message || "Could not update name.", "error");
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
+    }
+}
+
+async function onProfilePhotoSelected() {
+    var input = document.getElementById("profileModalPhotoInput");
     if (!input || !input.files || !input.files.length) return;
     var file = input.files[0];
-    if (!file.type || !file.type.startsWith("image/")) {
-        toast("Please choose an image file (e.g. JPG, PNG).", "warning");
+    if (!file.type || !/^image\//.test(file.type)) {
+        toast("Please choose an image file (JPG, PNG, etc.).", "warning");
         input.value = "";
         return;
     }
-    var reader = new FileReader();
-    reader.onload = function () {
-        var profileImg = document.getElementById("profilePhoto");
-        if (profileImg && reader.result) {
-            profileImg.src = reader.result;
-            if (userEmail) {
-                try { localStorage.setItem("profilePhoto_" + userEmail, reader.result); } catch (e) {}
-            }
-        }
-    };
-    reader.readAsDataURL(file);
-    input.value = "";
-}
-
-function loadSavedProfilePhoto() {
-    if (!userEmail) return;
-    var profileImg = document.getElementById("profilePhoto");
-    if (!profileImg) return;
+    var notice = toast("Uploading photo…", "loading", { persistent: true });
     try {
-        var saved = localStorage.getItem("profilePhoto_" + userEmail);
-        if (saved) profileImg.src = saved;
-    } catch (e) {}
+        var dataUrl = await _imageFileToCompressedDataUrl(file, 256);
+        var data = await _patchProfile({ profile_photo: dataUrl });
+        if (notice) removeToast(notice);
+        applyProfileToUI(data);
+        toast("Profile photo updated.", "success");
+    } catch (e) {
+        if (notice) removeToast(notice);
+        toast(e.message || "Could not update photo.", "error");
+    } finally {
+        input.value = "";
+    }
 }
 
 /* ---------------- LOGIN POPUP ---------------- */
@@ -408,7 +639,7 @@ async function doVerifyOtp() {
             try { localStorage.setItem("userEmail", email); localStorage.setItem("loginMode", "company"); } catch(e) {}
             applyCompanyLoginUI(email);
         }
-        loadSavedProfilePhoto();
+        refreshProfileFromServer();
         var claimed = await claimGuestChatIfAny(email);
         if (!claimed) loadUserData(email);
         // Restore pending message after login
@@ -452,7 +683,7 @@ async function doVerifyOtp() {
                 applyPersonalLoginUI(savedEmail);
             }
 
-            loadSavedProfilePhoto();
+            refreshProfileFromServer();
 
             var savedChat = localStorage.getItem("currentChat");
             loadUserData(savedEmail).then(function() {
@@ -592,8 +823,10 @@ function applyPersonalLoginUI(email) {
     document.getElementById("loginBtn").style.display = "none";
     document.getElementById("profileBox").style.display = "block";
     var nameEl = document.getElementById("profileName");
-    nameEl.textContent = email;
     nameEl.title = email;
+    if (!applyCachedProfileImmediately(email)) {
+        nameEl.textContent = _defaultDisplayNameFromEmail(email);
+    }
     document.getElementById("documentSection").style.display = "block";
     document.getElementById("documentSectionTitle").textContent = "Global Documents";
     document.getElementById("documentUploadWrap").style.display = "block";
@@ -615,8 +848,10 @@ function applyCompanyLoginUI(email) {
     document.getElementById("loginBtn").style.display = "none";
     document.getElementById("profileBox").style.display = "block";
     var nameEl = document.getElementById("profileName");
-    nameEl.textContent = email;
     nameEl.title = email;
+    if (!applyCachedProfileImmediately(email)) {
+        nameEl.textContent = _defaultDisplayNameFromEmail(email);
+    }
     document.getElementById("documentSection").style.display = "block";
     document.getElementById("documentSectionTitle").textContent = "Company Documents";
     document.getElementById("globalDocsBlock").style.display = "none";
@@ -636,6 +871,13 @@ function applyCompanyLoginUI(email) {
 
 function logout() {
     closeProfileDropdown();
+    closeProfileModal();
+    _clearCachedProfile(userEmail);
+    _profileCache = { email: null, display_name: null, profile_photo: null };
+    var sidebarImg = document.getElementById("profilePhoto");
+    if (sidebarImg) sidebarImg.src = DEFAULT_AVATAR_URL;
+    var profileNameEl = document.getElementById("profileName");
+    if (profileNameEl) { profileNameEl.textContent = "Account"; profileNameEl.title = ""; }
     loginMode = "guest";
     userEmail = null;
     chatIdByName = {};
@@ -785,21 +1027,100 @@ async function claimGuestChatIfAny(email) {
     }
 }
 
+/** Tracks created chats that haven't been used yet (no message, no doc, no API key).
+    Used so clicking "+ New Chat" reuses an existing empty chat instead of piling up empties. */
+var _emptyChats = (function () {
+    var s = {};
+    return {
+        add: function (name) { if (name) s[name] = true; },
+        remove: function (name) { if (name) delete s[name]; },
+        has: function (name) { return !!s[name]; },
+        first: function () { for (var k in s) { if (s.hasOwnProperty(k)) return k; } return null; },
+        clearAll: function () { s = {}; }
+    };
+})();
+
+/** Slim animated bar at the top — for lightweight transitions like opening a new empty chat. */
+function showTopProgress() {
+    var bar = document.getElementById("topProgressBar");
+    if (bar) bar.classList.add("is-active");
+}
+function hideTopProgress() {
+    var bar = document.getElementById("topProgressBar");
+    if (bar) bar.classList.remove("is-active");
+}
+
+/** Polished skeleton loader for chat history. Shows immediately on chat click. */
+function showChatLoading(label) {
+    var chatArea = document.getElementById("chatArea");
+    if (!chatArea) return;
+    var html =
+        '<div class="chat-loading" id="chatLoading" role="status" aria-live="polite" aria-label="Loading messages">' +
+        '<div class="chat-loading-row">' +
+            '<div class="chat-loading-avatar"></div>' +
+            '<div class="chat-loading-bubble chat-loading-bubble--med"></div>' +
+        '</div>' +
+        '<div class="chat-loading-row chat-loading-row--user">' +
+            '<div class="chat-loading-bubble chat-loading-bubble--short"></div>' +
+        '</div>' +
+        '<div class="chat-loading-row">' +
+            '<div class="chat-loading-avatar"></div>' +
+            '<div class="chat-loading-bubble chat-loading-bubble--long"></div>' +
+        '</div>' +
+        '<div class="chat-loading-row chat-loading-row--user">' +
+            '<div class="chat-loading-bubble chat-loading-bubble--med"></div>' +
+        '</div>' +
+        '<div class="chat-loading-status">' +
+            '<span class="chat-loading-spinner" aria-hidden="true"></span>' +
+            '<span>' + (label || "Loading chat…") + '</span>' +
+        '</div>' +
+        '</div>';
+    chatArea.innerHTML = html;
+}
+
+function hideChatLoading() {
+    var el = document.getElementById("chatLoading");
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+}
+
+/** Render an array of messages using a single fragment + one scroll for fast loads. */
+function renderMessagesBatch(messages) {
+    var chatArea = document.getElementById("chatArea");
+    if (!chatArea) return;
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < messages.length; i++) {
+        var msg = messages[i];
+        var node = buildMessageNode(msg.content, msg.role);
+        if (node) frag.appendChild(node);
+    }
+    chatArea.appendChild(frag);
+    requestAnimationFrame(function () {
+        scrollChatToBottomSmooth();
+    });
+}
+
+/** Token to ignore stale responses when the user rapidly switches chats. */
+var _chatLoadToken = 0;
+
 /** Load messages for currentChat from server and re-render. Used after claiming guest chat so messages show under user. */
 async function loadMessagesForCurrentChat() {
     if (!currentChat || !userEmail) return;
     var chatArea = document.getElementById("chatArea");
     if (!chatArea) return;
-    chatArea.innerHTML = "";
+    var token = ++_chatLoadToken;
+    showTopProgress();
     try {
         var res = await fetch(
             API_BASE + "/messages/" + encodeURIComponent(userEmail) + "/" + encodeURIComponent(currentChat)
         );
         var data = await res.json();
+        if (token !== _chatLoadToken) {
+            hideTopProgress();
+            return;
+        }
         var messages = data.messages || [];
-        messages.forEach(function (msg) {
-            addMessage(msg.content, msg.role);
-        });
+        chatArea.innerHTML = "";
+        renderMessagesBatch(messages);
         if (messages.length > 0) {
             showChatView();
         } else {
@@ -808,6 +1129,8 @@ async function loadMessagesForCurrentChat() {
     } catch (e) {
         console.error("Error loading messages for current chat", e);
         showStartView();
+    } finally {
+        hideTopProgress();
     }
 }
 
@@ -851,13 +1174,28 @@ async function createChat() {
         toast("Please sign in first.", "info");
         return;
     }
+
+    // ChatGPT-style: if an unused empty chat already exists, reuse it instead of creating another.
+    var reusable = _emptyChats.first();
+    if (reusable && chats.indexOf(reusable) !== -1) {
+        if (currentChat === reusable) {
+            closeSidebar();
+            return;
+        }
+        await selectChat(reusable, { knownEmpty: true });
+        return;
+    }
+
+    showTopProgress();
     var chatName = await createNewChatAndReturnName();
     if (!chatName) {
+        hideTopProgress();
         toast("Could not create chat. Is the backend running?", "error");
         return;
     }
+    _emptyChats.add(chatName);
     renderChats();
-    await selectChat(chatName);
+    await selectChat(chatName, { knownEmpty: true });
 }
 
 function renderChats() {
@@ -994,7 +1332,8 @@ async function renameChatOnServer(oldName, newName) {
     }
 }
 
-async function selectChat(chatName) {
+async function selectChat(chatName, opts) {
+    var options = opts || {};
     closeSidebar();
     closeDatabaseView();
     closeChatApiKeyPopover();
@@ -1002,50 +1341,75 @@ async function selectChat(chatName) {
     currentChat = chatName;
     try { localStorage.setItem("currentChat", chatName); } catch(e) {}
     document.getElementById("chatTitle").innerText = chatName;
-    document.getElementById("chatArea").innerHTML = "";
+    var chatArea = document.getElementById("chatArea");
+    if (chatArea) chatArea.innerHTML = "";
     renderChats();
 
-    // Show chat documents panel (header right) for guest and personal; hide for company
+    var token = ++_chatLoadToken;
+    var isKnownEmpty = !!options.knownEmpty || _emptyChats.has(chatName);
+    if (isKnownEmpty) {
+        showStartView();
+    } else {
+        showChatView();
+    }
+    showTopProgress();
+
     var panel = document.getElementById("chatDocsPanel");
     if (panel) panel.style.display = (loginMode === "company") ? "none" : "block";
+
+    var docsPromise = Promise.resolve();
     if (loginMode === "personal" && panel) {
-        // If we don't have this chat's docs yet (e.g. new chat), fetch from API
         if (!chatDocuments[chatName]) {
-            try {
-                const chatDocRes = await fetch(`${API_BASE}/documents/${userEmail}/${encodeURIComponent(chatName)}`);
-                const chatDocData = await chatDocRes.json();
-                const chatDocList = chatDocData.documents || [];
-                chatDocuments[chatName] = chatDocList.map(function (d) { return { id: d.id, name: d.name, file: null, has_preview: d.has_preview }; });
-            } catch (err) {
-                console.error("Error loading docs for chat", err);
-                chatDocuments[chatName] = [];
-            }
+            docsPromise = fetch(API_BASE + "/documents/" + encodeURIComponent(userEmail) + "/" + encodeURIComponent(chatName))
+                .then(function (r) { return r.json(); })
+                .then(function (chatDocData) {
+                    var chatDocList = (chatDocData && chatDocData.documents) || [];
+                    chatDocuments[chatName] = chatDocList.map(function (d) {
+                        return { id: d.id, name: d.name, file: null, has_preview: d.has_preview };
+                    });
+                })
+                .catch(function (err) {
+                    console.error("Error loading docs for chat", err);
+                    chatDocuments[chatName] = [];
+                });
         }
-        renderChatDocs();
     }
 
+    var messagesPromise = fetch(
+        API_BASE + "/messages/" + encodeURIComponent(userEmail) + "/" + encodeURIComponent(chatName)
+    )
+    .then(function (res) { return res.json(); })
+    .catch(function (err) {
+        console.error("Error loading messages:", err);
+        return { messages: [] };
+    });
+
+    var results;
     try {
-        const res = await fetch(
-            API_BASE + "/messages/" + encodeURIComponent(userEmail) + "/" + encodeURIComponent(chatName)
-        );
+        results = await Promise.all([messagesPromise, docsPromise]);
+    } catch (e) {
+        results = [{ messages: [] }];
+    }
 
-        const data = await res.json();
-        var messages = data.messages || [];
+    if (token !== _chatLoadToken) {
+        hideTopProgress();
+        return;
+    }
 
-        messages.forEach(msg => {
-            addMessage(msg.content, msg.role);
-        });
+    var data = results[0] || { messages: [] };
+    var messages = data.messages || [];
 
-        if (messages.length > 0) {
-            showChatView();
-        } else {
-            showStartView();
-        }
-    } catch (error) {
-        console.error("Error loading messages:", error);
+    if (chatArea) chatArea.innerHTML = "";
+    if (messages.length > 0) {
+        renderMessagesBatch(messages);
+        showChatView();
+        _emptyChats.remove(chatName);
+    } else {
         showStartView();
     }
+    hideTopProgress();
 
+    if (loginMode === "personal" && panel) renderChatDocs();
     updateApiKeysSectionVisibility();
     renderChatApiKeysList();
 }
@@ -1255,6 +1619,7 @@ async function createChatApiKey() {
             reveal.textContent = "Save this key now (shown once): " + (data.api_key || "");
         }
         if (labelIn) labelIn.value = "";
+        if (currentChat) _emptyChats.remove(currentChat);
         await refreshApiKeys();
         toast("Chat API key created.", "success");
     } catch (e) {
@@ -1344,6 +1709,7 @@ async function uploadChatDoc() {
         }
         chatDocuments[currentChat] = chatDocuments[currentChat] || [];
         chatDocuments[currentChat].push({ id: data.document_id, name: file.name, file: file, has_preview: true });
+        _emptyChats.remove(currentChat);
         renderChatDocs();
         fileInput.value = "";
         if (data.message) toast(data.message, "success");
@@ -1637,7 +2003,9 @@ async function sendMessage() {
         return;
     }
 
-    addMessage(message, "user");
+    var isVoiceTurn = !!(window.VoiceMode && window.VoiceMode.isActive());
+    if (currentChat) _emptyChats.remove(currentChat);
+    addMessage(message, "user", { voice: isVoiceTurn });
     input.value = "";
     if (!document.getElementById("chatContainer").classList.contains("has-messages")) {
         showChatView();
@@ -1657,21 +2025,28 @@ async function sendMessage() {
             mode: userEmail ? loginMode : "personal",
             email: userEmail || "guest",
             chat: currentChat,
-            message: message
+            message: message,
+            voice: isVoiceTurn
         })
     })
     .then(function (res) {
-        return consumeChatStreamResponse(res);
+        return consumeChatStreamResponse(res, { voice: isVoiceTurn });
     })
     .then(function (result) {
         if (result && result.ok && !userEmail) {
             setGuestMessageCount(getGuestMessageCount() + 1);
+        }
+        if (window.VoiceMode && window.VoiceMode.isActive() && result && result.assistantText) {
+            window.VoiceMode.handleAssistantReply(result.assistantText);
         }
     })
     .catch(function (error) {
         console.error("Error:", error);
         removeTypingIndicator();
         addMessage("Error: " + (error.message || "Server unreachable. Is the backend running?"), "bot");
+        if (window.VoiceMode && window.VoiceMode.isActive()) {
+            window.VoiceMode.handleError(error.message || "Sorry, something went wrong.");
+        }
     });
 }
 
@@ -1703,7 +2078,8 @@ function removeTypingIndicator() {
 }
 
 /** Empty bot bubble for SSE chunks (same layout as addMessage role bot). */
-function createStreamingBotMessage() {
+function createStreamingBotMessage(opts) {
+    var voice = !!(opts && opts.voice);
     var chatArea = document.getElementById("chatArea");
     var wrapper = document.createElement("div");
     wrapper.className = "message-row message-row--assistant";
@@ -1716,15 +2092,33 @@ function createStreamingBotMessage() {
     avatar.alt = "DocuMind";
     var messageDiv = document.createElement("div");
     messageDiv.className = "message bot";
-    messageDiv.innerText = "";
+    if (voice) messageDiv.classList.add("message--voice");
+    messageDiv.innerText = voice ? "\u00ab" : "";
     wrapper.appendChild(avatar);
     wrapper.appendChild(messageDiv);
     chatArea.appendChild(wrapper);
     scrollChatToBottomSmooth();
+    var fullText = "";
+    var finalized = false;
     return {
         append: function (s) {
-            messageDiv.innerText += s;
+            fullText += s;
+            if (voice) {
+                messageDiv.innerText = "\u00ab" + fullText;
+            } else {
+                messageDiv.innerText += s;
+            }
             scrollChatToBottomSmooth();
+        },
+        finalize: function () {
+            if (finalized) return;
+            finalized = true;
+            if (voice) {
+                messageDiv.innerText = "\u00ab" + fullText.trim() + "\u00bb";
+            }
+        },
+        getText: function () {
+            return fullText;
         }
     };
 }
@@ -1733,7 +2127,7 @@ function createStreamingBotMessage() {
  * Read POST /chat/stream SSE: JSON lines data: {"t":"d","c":"..."} | {"t":"done"} | {"t":"e","m":"..."}
  * @returns {Promise<{ ok: boolean, hadAssistantBubble: boolean }>}
  */
-function consumeChatStreamResponse(res) {
+function consumeChatStreamResponse(res, streamOpts) {
     if (!res.ok) {
         return res.text().then(function (t) {
             throw new Error(res.status + " " + (t || res.statusText));
@@ -1742,6 +2136,7 @@ function consumeChatStreamResponse(res) {
     if (!res.body || typeof res.body.getReader !== "function") {
         return Promise.reject(new Error("Streaming not supported in this browser."));
     }
+    var voice = !!(streamOpts && streamOpts.voice);
     var reader = res.body.getReader();
     var dec = new TextDecoder();
     var buf = "";
@@ -1767,10 +2162,11 @@ function consumeChatStreamResponse(res) {
                 }
                 if (ev.t === "d" && ev.c != null) {
                     removeTypingIndicator();
-                    if (!streamBubble) streamBubble = createStreamingBotMessage();
+                    if (!streamBubble) streamBubble = createStreamingBotMessage({ voice: voice });
                     streamBubble.append(String(ev.c));
                 } else if (ev.t === "done") {
                     removeTypingIndicator();
+                    if (streamBubble) streamBubble.finalize();
                     sawDone = true;
                 } else if (ev.t === "e") {
                     removeTypingIndicator();
@@ -1795,10 +2191,15 @@ function consumeChatStreamResponse(res) {
                 parseSseBlocks(buf);
                 buf = "";
                 removeTypingIndicator();
+                if (streamBubble) streamBubble.finalize();
                 if (!sawDone && !sawError && !streamBubble) {
                     addMessage("No reply from server.", "bot");
                 }
-                return { ok: sawDone && !sawError, hadAssistantBubble: !!streamBubble };
+                return {
+                    ok: sawDone && !sawError,
+                    hadAssistantBubble: !!streamBubble,
+                    assistantText: streamBubble ? streamBubble.getText() : ""
+                };
             }
             var lastSep = buf.lastIndexOf("\n\n");
             if (lastSep !== -1) {
@@ -1811,34 +2212,57 @@ function consumeChatStreamResponse(res) {
     return pump();
 }
 
-function addMessage(text, role) {
-    const chatArea = document.getElementById("chatArea");
+/** Detects a stored voice turn (wrapped in « … » by the server). */
+function isVoiceWrappedText(text) {
+    var s = (text == null ? "" : String(text)).trim();
+    return s.length >= 2 && s.charAt(0) === "\u00ab" && s.charAt(s.length - 1) === "\u00bb";
+}
 
-    const wrapper = document.createElement("div");
+/** Build a single message DOM node (without inserting). Used by addMessage and batch loaders. */
+function buildMessageNode(text, role, opts) {
+    var options = opts || {};
+    var voice = !!options.voice || isVoiceWrappedText(text);
+
+    var displayText = String(text == null ? "" : text);
+    if (voice && !isVoiceWrappedText(displayText)) {
+        displayText = "\u00ab" + displayText.trim() + "\u00bb";
+    }
+
+    var wrapper = document.createElement("div");
     wrapper.className = "message-row";
     wrapper.style.display = "flex";
     wrapper.style.alignItems = "flex-start";
     wrapper.style.marginBottom = "10px";
 
-    const messageDiv = document.createElement("div");
+    var messageDiv = document.createElement("div");
     messageDiv.className = "message " + role;
-    messageDiv.innerText = text;
+    if (voice) messageDiv.classList.add("message--voice");
+    messageDiv.innerText = displayText;
 
     if (role === "user") {
         wrapper.style.justifyContent = "flex-end";
         wrapper.appendChild(messageDiv);
     } else {
         wrapper.classList.add("message-row--assistant");
-        const avatar = document.createElement("img");
+        var avatar = document.createElement("img");
         avatar.className = "message-avatar message-avatar--bot";
         avatar.src = BOT_AVATAR_URL;
         avatar.alt = "DocuMind";
+        avatar.loading = "lazy";
         wrapper.appendChild(avatar);
         wrapper.appendChild(messageDiv);
     }
+    return wrapper;
+}
 
-    chatArea.appendChild(wrapper);
-    scrollChatToBottomSmooth();
+function addMessage(text, role, opts) {
+    var chatArea = document.getElementById("chatArea");
+    if (!chatArea) return;
+    var node = buildMessageNode(text, role, opts);
+    if (node) {
+        chatArea.appendChild(node);
+        scrollChatToBottomSmooth();
+    }
 }
 
 async function uploadDocument() {
@@ -2156,8 +2580,10 @@ function googleLogin() {
     try { localStorage.setItem("userEmail", email); localStorage.setItem("loginMode", "personal"); } catch(e) {}
     document.getElementById("loginBtn").style.display = "none";
     document.getElementById("profileBox").style.display = "block";
-    document.getElementById("profileName").textContent = email;
     document.getElementById("profileName").title = email;
+    if (!applyCachedProfileImmediately(email)) {
+        document.getElementById("profileName").textContent = _defaultDisplayNameFromEmail(email);
+    }
     document.getElementById("documentSection").style.display = "block";
     document.getElementById("documentSectionTitle").textContent = "Global Documents";
     document.getElementById("documentUploadWrap").style.display = "block";
@@ -2172,7 +2598,7 @@ function googleLogin() {
     var panel = document.getElementById("chatDocsPanel");
     if (panel) panel.style.display = "block";
     renderChatDocs();
-    loadSavedProfilePhoto();
+    refreshProfileFromServer();
     claimGuestChatIfAny(email).then(function (claimed) {
     if (!claimed) loadUserData(email).catch(function (e) { console.error("Error loading user data after Google login", e); });
     // Restore pending message
@@ -2247,3 +2673,362 @@ function googleLogin() {
         apply();
     }
 })();
+
+/* ============================================================
+   Voice Mode (ChatGPT-style fullscreen voice chat)
+   - Browser-only: SpeechRecognition (STT) + speechSynthesis (TTS)
+   - Uses existing sendMessage() → POST /chat/stream (same chat, same history,
+     same document chunks / rules as typed messages).
+   ============================================================ */
+window.VoiceMode = (function () {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var hasTTS = typeof window.speechSynthesis !== "undefined";
+    var recognition = null;
+    var active = false;
+    var listening = false;
+    var muted = false;
+    var awaitingReply = false;
+    var preferredVoice = null;
+
+    var GREETINGS = [
+        "Hi! I'm DocuMind. How can I help you today?",
+        "Hello! What can I help you find in your documents?",
+        "Hey there! Ask me anything about the documents you've uploaded.",
+        "Hi! I'm ready when you are — what would you like to know?"
+    ];
+
+    function el(id) { return document.getElementById(id); }
+
+    function setOrbState(state) {
+        var orb = el("voiceOrb");
+        if (orb) orb.setAttribute("data-state", state);
+    }
+
+    function setStatus(text) {
+        var s = el("voiceStatusText");
+        if (s) s.textContent = text;
+    }
+
+    function pickVoice() {
+        if (!hasTTS) return null;
+        var voices = window.speechSynthesis.getVoices() || [];
+        if (!voices.length) return null;
+        function score(v) {
+            var n = (v.name || "").toLowerCase();
+            var lang = (v.lang || "").toLowerCase();
+            var s = 0;
+            if (/natural|neural|premium|enhanced/i.test(n)) s += 120;
+            if (/microsoft/i.test(n) && (/aria|jenny|guy|michelle|sonia|ashley|ryan|olivia|emma/i.test(n))) s += 70;
+            if (/google/i.test(n) && (/english.*female|us english|uk english female/i.test(n))) s += 65;
+            if (/samantha|karen|daniel|zira|hazel|alex/i.test(n)) s += 55;
+            if (/compact/i.test(n)) s -= 40;
+            if (/robot|novelty/i.test(n)) s -= 80;
+            if (/^en-us|^en_us|^en-us-/i.test(lang)) s += 35;
+            else if (lang.indexOf("en") === 0) s += 18;
+            return s;
+        }
+        var best = null;
+        var bestScore = -1;
+        for (var i = 0; i < voices.length; i++) {
+            var sc = score(voices[i]);
+            if (sc > bestScore) {
+                bestScore = sc;
+                best = voices[i];
+            }
+        }
+        return best || voices[0];
+    }
+
+    function refreshVoices() {
+        if (!hasTTS) return;
+        preferredVoice = pickVoice();
+    }
+
+    /** Split reply into short phrases for calmer, more natural pacing (browser TTS). */
+    function splitForSpeech(text) {
+        var t = String(text || "").replace(/\s+/g, " ").trim();
+        if (!t) return [];
+        if (t.length < 100) return [t];
+        var chunks = t.match(/[^.!?]+[.!?]+|[^.!?]+$/g);
+        if (!chunks || chunks.length <= 1) return [t];
+        var out = [];
+        for (var i = 0; i < chunks.length; i++) {
+            var c = chunks[i].trim();
+            if (c) out.push(c);
+        }
+        return out.length ? out : [t];
+    }
+
+    function ensureRecognition() {
+        if (!SR) return null;
+        if (recognition) return recognition;
+        recognition = new SR();
+        recognition.lang = "en-US";
+        recognition.interimResults = true;
+        recognition.continuous = false;
+        recognition.maxAlternatives = 1;
+
+        var lastFinal = "";
+
+        recognition.onstart = function () {
+            listening = true;
+            setOrbState("listening");
+            setStatus("Listening…");
+        };
+        recognition.onresult = function (e) {
+            var interim = "";
+            lastFinal = "";
+            for (var i = e.resultIndex; i < e.results.length; i++) {
+                var r = e.results[i];
+                if (r.isFinal) lastFinal += r[0].transcript;
+                else interim += r[0].transcript;
+            }
+            var shown = (lastFinal + interim).trim();
+            if (shown) setStatus("\u201C" + shown + "\u201D");
+        };
+        recognition.onerror = function (ev) {
+            listening = false;
+            if (ev && (ev.error === "no-speech" || ev.error === "aborted")) {
+                if (active && !muted && !awaitingReply) {
+                    setStatus("Didn't catch that — try again.");
+                    safeStart(800);
+                }
+                return;
+            }
+            if (ev && ev.error === "not-allowed") {
+                setStatus("Mic permission denied. Please allow microphone access.");
+                setOrbState("muted");
+                return;
+            }
+            setStatus("Mic error. Tap the mic to try again.");
+            setOrbState("idle");
+        };
+        recognition.onend = function () {
+            listening = false;
+            if (!active) return;
+            var transcript = (lastFinal || "").trim();
+            lastFinal = "";
+            if (transcript) {
+                submitTranscript(transcript);
+            } else if (!awaitingReply && !muted) {
+                safeStart(400);
+            }
+        };
+        return recognition;
+    }
+
+    function safeStart(delayMs) {
+        if (!active || muted || awaitingReply) return;
+        setTimeout(function () {
+            if (!active || muted || awaitingReply) return;
+            try {
+                ensureRecognition();
+                if (recognition && !listening) recognition.start();
+            } catch (e) {
+                console.warn("Voice: recognition.start() failed", e);
+            }
+        }, delayMs || 0);
+    }
+
+    function stopListening() {
+        if (recognition && listening) {
+            try { recognition.stop(); } catch (e) {}
+        }
+        listening = false;
+    }
+
+    function speak(text, onDone) {
+        if (!hasTTS || !text) {
+            if (onDone) onDone();
+            return;
+        }
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+        var clean = String(text).replace(/[\u2022\u2023\u25E6\*\#`>_]/g, "").replace(/\s+/g, " ").trim();
+        if (!clean) { if (onDone) onDone(); return; }
+
+        var chunks = splitForSpeech(clean);
+        var idx = 0;
+
+        function speakChunk() {
+            if (!active) {
+                if (onDone) onDone();
+                return;
+            }
+            if (idx >= chunks.length) {
+                if (onDone) onDone();
+                return;
+            }
+            var u = new SpeechSynthesisUtterance(chunks[idx]);
+            u.lang = "en-US";
+            u.rate = 0.92;
+            u.pitch = 0.98;
+            u.volume = 1;
+            if (!preferredVoice) preferredVoice = pickVoice();
+            if (preferredVoice) u.voice = preferredVoice;
+
+            setOrbState("speaking");
+            setStatus("Speaking…");
+
+            u.onend = function () {
+                idx++;
+                if (idx < chunks.length) {
+                    setTimeout(speakChunk, 140);
+                } else if (onDone) {
+                    onDone();
+                }
+            };
+            u.onerror = function () {
+                idx++;
+                if (idx < chunks.length) {
+                    setTimeout(speakChunk, 80);
+                } else if (onDone) {
+                    onDone();
+                }
+            };
+            try {
+                window.speechSynthesis.speak(u);
+            } catch (e) {
+                if (onDone) onDone();
+            }
+        }
+
+        speakChunk();
+    }
+
+    function submitTranscript(text) {
+        var input = el("messageInput");
+        if (!input) return;
+        input.value = text;
+        awaitingReply = true;
+        setOrbState("thinking");
+        setStatus("Thinking…");
+        try {
+            sendMessage();
+        } catch (e) {
+            console.error(e);
+            awaitingReply = false;
+            setStatus("Couldn't send. Tap × to close.");
+        }
+    }
+
+    function handleAssistantReply(text) {
+        awaitingReply = false;
+        if (!active) return;
+        speak(text, function () {
+            if (!active) return;
+            setOrbState("idle");
+            setStatus("Tap to speak, or just talk…");
+            safeStart(250);
+        });
+    }
+
+    function handleError(msg) {
+        awaitingReply = false;
+        if (!active) return;
+        setOrbState("idle");
+        setStatus(msg || "Something went wrong.");
+        safeStart(800);
+    }
+
+    function startGreeting() {
+        if (!active) return;
+        if (hasTTS) refreshVoices();
+        var greeting = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
+        setStatus(greeting);
+        speak(greeting, function () {
+            if (!active) return;
+            if (!SR) {
+                setStatus("Speech input isn't supported in this browser. Type instead, or use Chrome/Edge.");
+                return;
+            }
+            setOrbState("idle");
+            setStatus("Listening…");
+            safeStart(150);
+        });
+    }
+
+    function open() {
+        if (active) return;
+        if (!SR && !hasTTS) {
+            alert("Voice mode isn't supported in this browser. Try Chrome, Edge, or Safari.");
+            return;
+        }
+        var overlay = el("voiceOverlay");
+        if (!overlay) return;
+        overlay.classList.add("is-open");
+        overlay.setAttribute("aria-hidden", "false");
+        active = true;
+        muted = false;
+        awaitingReply = false;
+        setOrbState("idle");
+        var muteBtn = el("voiceMuteBtn");
+        if (muteBtn) muteBtn.classList.remove("is-muted");
+
+        if (hasTTS && window.speechSynthesis.getVoices().length === 0) {
+            var started = false;
+            function begin() {
+                if (started || !active) return;
+                started = true;
+                window.speechSynthesis.removeEventListener("voiceschanged", begin);
+                startGreeting();
+            }
+            window.speechSynthesis.addEventListener("voiceschanged", begin);
+            setTimeout(begin, 400);
+        } else {
+            startGreeting();
+        }
+    }
+
+    function close() {
+        if (!active) return;
+        active = false;
+        awaitingReply = false;
+        listening = false;
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+        try { if (recognition) recognition.abort(); } catch (e) {}
+        var overlay = el("voiceOverlay");
+        if (overlay) {
+            overlay.classList.remove("is-open");
+            overlay.setAttribute("aria-hidden", "true");
+        }
+        setOrbState("idle");
+    }
+
+    function toggleMute() {
+        muted = !muted;
+        var btn = el("voiceMuteBtn");
+        if (btn) btn.classList.toggle("is-muted", muted);
+        if (muted) {
+            stopListening();
+            setOrbState("muted");
+            setStatus("Mic muted. Tap the mic to unmute.");
+        } else {
+            setOrbState("idle");
+            setStatus("Listening…");
+            safeStart(150);
+        }
+    }
+
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && active) close();
+    });
+
+    return {
+        open: open,
+        close: close,
+        toggleMute: toggleMute,
+        isActive: function () { return active; },
+        handleAssistantReply: handleAssistantReply,
+        handleError: handleError
+    };
+})();
+
+function openVoiceMode() {
+    if (window.VoiceMode) window.VoiceMode.open();
+}
+function closeVoiceMode() {
+    if (window.VoiceMode) window.VoiceMode.close();
+}
+function toggleVoiceMute() {
+    if (window.VoiceMode) window.VoiceMode.toggleMute();
+}

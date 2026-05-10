@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="description" content="Chat with your PDFs in Hindi, Hinglish, Spanish, French and more. How DocuMind answers in your language even when the PDF is in English — and how to phrase questions for best results.">
+    <meta name="keywords" content="chat with PDF in Hindi, Hinglish PDF chat, AI PDF chat Spanish, multilingual AI document, document chat in your language, DocuMind Hindi, RAG multilingual, multilingual PDF Q&amp;A">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="alternate" hreflang="x-default" href="{{ canonical_url }}">
+
+    <meta property="og:title" content="Chat with PDFs in Hindi, Hinglish, Spanish &amp; more | DocuMind">
+    <meta property="og:description" content="DocuMind replies in the same language you ask in — Hindi, Hinglish, Spanish, French — even if the PDF is in English. How to use it.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:site_name" content="DocuMind">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+    <meta property="og:image:alt" content="Multilingual AI PDF chat with DocuMind">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Multilingual PDF chat with DocuMind">
+    <meta name="twitter:description" content="Hindi, Hinglish, Spanish, French — ask in your language.">
+    <meta name="twitter:image" content="{{ public_base_url }}/static/bot-avtar.png?v=1">
+
+    <script type="application/ld+json">{{ structured_data_json | safe }}</script>
+    <title>Chat with PDFs in your own language — Hindi, Spanish &amp; more | DocuMind blog</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
+    <link rel="stylesheet" href="/static/how-it-works.css?v=5">
+</head>
+<body class="how-page">
+
+{% include "_top_progress.html" %}
+
+{% include "blog/_nav.html" %}
+
+<main class="how-wrap blog-article">
+    <article>
+        <header>
+            <p class="blog-article-kicker"><a href="/blog">← Blog</a></p>
+            <h1>How to chat with PDFs in your own language — Hindi, Spanish &amp; more</h1>
+            <p class="blog-article-meta">Updated for DocuMind · <time datetime="2026-05-10">May 10, 2026</time></p>
+        </header>
+
+        <p>
+            Most AI PDF chat tools assume English. You upload an English PDF, you ask in English, you get English back. That excludes a lot of the world.
+            <a href="/">DocuMind</a> is built so the language you <em>ask</em> in is the language you <em>get back</em> — even when the document is in a different language.
+            This guide explains how that works and the prompt patterns that produce the cleanest replies.
+        </p>
+
+        <h2>How multilingual PDF chat works under the hood</h2>
+        <p>
+            DocuMind uses two systems together:
+        </p>
+        <ol class="blog-article-ol">
+            <li><strong>Embeddings</strong> — your question and document chunks are turned into multilingual vectors, so a question in Hindi can still match an English passage by meaning, not by exact words.</li>
+            <li><strong>Generation</strong> — the model is instructed to reply in the same language and script you used for the question, regardless of the PDF’s language.</li>
+        </ol>
+        <p>
+            This means you can upload an English HR policy and ask about it entirely in Hindi, Hinglish, Spanish, French, Tamil, Marathi, Bengali, Arabic, etc. The retrieval still hits the right English paragraph; the answer comes back in your language.
+        </p>
+
+        <h2>Examples</h2>
+
+        <h3>Hindi</h3>
+        <p><em>Question:</em> मेरी छुट्टी की पॉलिसी क्या है? (What is my leave policy?)</p>
+        <p><em>Document:</em> English HR PDF.</p>
+        <p><em>DocuMind:</em> Replies in Hindi using the rules from the English document. If a term has no clean Hindi equivalent (e.g. PTO), DocuMind keeps the English word and adds a short gloss.</p>
+
+        <h3>Hinglish</h3>
+        <p>“Bro yeh contract ka termination clause kya bolta hai?” works fine. DocuMind matches the casual register and replies in Hinglish.</p>
+
+        <h3>Spanish</h3>
+        <p><em>Question:</em> ¿Cuál es la política de reembolso?</p>
+        <p>DocuMind retrieves from the same indexed PDF and replies in clean Spanish.</p>
+
+        <h3>Voice mode</h3>
+        <p>
+            Voice mode picks up your spoken language. If you ask in Hindi out loud, the assistant answers in Hindi out loud — see <a href="/blog/voice-pdf-qa-rest-api">voice PDF Q&amp;A</a>.
+        </p>
+
+        <h2>Prompt patterns that work best across languages</h2>
+
+        <h3>1. Be explicit if you want a specific output language</h3>
+        <pre class="how-snippet">Reply in formal Hindi (Devanagari script). Don't switch to English unless you're quoting from the document.</pre>
+
+        <h3>2. Ask for the original quote alongside the translation</h3>
+        <pre class="how-snippet">Translate the answer into Spanish. Then quote the exact English sentence from the PDF that supports it.</pre>
+        <p>This dramatically reduces translation drift on legal text.</p>
+
+        <h3>3. Mix languages on purpose</h3>
+        <p>
+            For a glossary that names English terms (like “PTO”, “EOD”, “stand-up”), it’s usually clearer to keep those terms in English even when the explanation is in Hindi or Spanish. Tell DocuMind that explicitly.
+        </p>
+
+        <h2>What still goes wrong sometimes</h2>
+        <ul>
+            <li><strong>Mixed-script PDFs.</strong> A scanned PDF that has Hindi text as <em>images</em> needs OCR support; quality varies. Re-export the PDF as text-selectable if possible.</li>
+            <li><strong>Very specialized terms.</strong> Tax / medical jargon may not have an idiomatic translation; DocuMind will keep the original term and add a short note.</li>
+            <li><strong>Right-to-left scripts.</strong> Arabic and Hebrew render correctly in chat, but copy-pasting into your own UI may need RTL CSS handling.</li>
+        </ul>
+
+        <h2>Why this matters</h2>
+        <p>
+            Document Q&amp;A is most useful in places where the documents are <em>not</em> in your first language: students reading research papers, employees reading policies, contractors reading clauses.
+            A multilingual <strong>AI document assistant</strong> closes that gap directly — read in any language, ask in your own, decide quickly.
+        </p>
+
+        <p class="blog-article-outro">
+            Try it: <a href="/">documind.parshantyadav.com</a> ·
+            Related: <a href="/blog/tips-better-answers-from-pdfs">tips for better answers</a>,
+            <a href="/blog/pdf-chat-for-students">PDF chat for students</a>,
+            <a href="/how-it-works">how it works</a>.
+        </p>
+    </article>
+</main>
+</body>
+</html>

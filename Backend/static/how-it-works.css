@@ -497,6 +497,17 @@ a.how-nav-brand-link:hover {
     color: #475569;
 }
 
+/* Optional voice API subsection inside HTTP API card */
+.how-api-voice-wrap {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.how-api-voice-wrap h3 {
+    margin-top: 0;
+}
+
 @media (max-width: 640px) {
     .how-wrap {
         padding: 20px 14px 40px;
