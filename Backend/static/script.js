@@ -1976,6 +1976,14 @@ async function sendMessage() {
 
     if (!message || !message.trim()) return;
 
+    /** Voice submit sets awaitingReply before sendMessage; must clear on every exit path or mic stays dead. */
+    var voiceModeOn = !!(window.VoiceMode && window.VoiceMode.isActive());
+    function finishVoicePending() {
+        if (voiceModeOn && window.VoiceMode) {
+            window.VoiceMode.handleAssistantReply("");
+        }
+    }
+
     if (!currentChat) {
         if (!userEmail) {
             currentChat = getOrCreateGuestChatId();
@@ -1984,6 +1992,7 @@ async function sendMessage() {
             var newName = await createNewChatAndReturnName();
             if (!newName) {
                 toast("Could not create chat. Is the backend running?", "error");
+                finishVoicePending();
                 return;
             }
             currentChat = newName;
@@ -2000,10 +2009,11 @@ async function sendMessage() {
     if (!userEmail && getGuestMessageCount() >= 2) {
         openLoginPopup();
         toast("Please sign in to continue chatting.", "info");
+        finishVoicePending();
         return;
     }
 
-    var isVoiceTurn = !!(window.VoiceMode && window.VoiceMode.isActive());
+    var isVoiceTurn = voiceModeOn;
     if (currentChat) _emptyChats.remove(currentChat);
     addMessage(message, "user", { voice: isVoiceTurn });
     input.value = "";
@@ -2036,8 +2046,12 @@ async function sendMessage() {
         if (result && result.ok && !userEmail) {
             setGuestMessageCount(getGuestMessageCount() + 1);
         }
-        if (window.VoiceMode && window.VoiceMode.isActive() && result && result.assistantText) {
-            window.VoiceMode.handleAssistantReply(result.assistantText);
+        // Always end the voice turn (clears awaitingReply) even if the model body is empty — otherwise
+        // the mic never restarts and the user gets no follow-up after e.g. language switch + Hindi ask.
+        if (window.VoiceMode && window.VoiceMode.isActive()) {
+            window.VoiceMode.handleAssistantReply(
+                result && result.assistantText != null ? String(result.assistantText) : ""
+            );
         }
     })
     .catch(function (error) {
@@ -2989,9 +3003,12 @@ window.VoiceMode = (function () {
         recognition.maxAlternatives = 1;
 
         var lastFinal = "";
+        /** Last live transcript (final + interim). Some locales leave the tail non-final on onend — use as fallback. */
+        var lastShownForSubmit = "";
 
         recognition.onstart = function () {
             listening = true;
+            lastShownForSubmit = "";
             setOrbState("listening");
             setStatus(t("listening"));
         };
@@ -3007,6 +3024,7 @@ window.VoiceMode = (function () {
                 else interim += r[0].transcript;
             }
             var shown = (lastFinal + interim).trim();
+            if (shown) lastShownForSubmit = shown;
 
             // Barge-in: if the bot is speaking AND this is real user speech (VAD + text gates),
             // cut the bot off immediately. The final transcript will be submitted via onend.
@@ -3040,8 +3058,11 @@ window.VoiceMode = (function () {
         recognition.onend = function () {
             listening = false;
             if (!active) return;
-            var transcript = (lastFinal || "").trim();
+            // Prefer lastShownForSubmit: it matches what the user saw and includes interim when the engine
+            // ends the session before marking the last segment final (common on hi-IN).
+            var transcript = (lastShownForSubmit || lastFinal || "").trim();
             lastFinal = "";
+            lastShownForSubmit = "";
             if (transcript) {
                 submitTranscript(transcript);
             } else if (!awaitingReply && !muted) {
@@ -3172,8 +3193,9 @@ window.VoiceMode = (function () {
         /\bhindi\s+(please|plz|pls)\b/i,
         /\bhindi\s+mode\b/i,
         /\b(turn|switch)\s+on\s+hindi\b/i,
-        /हिंदी\s*(में|me|mein|main)?\s*(बात|बोलो|बोल|जवाब|reply)/,
-        /हिन्दी\s*(में|me|mein|main)?\s*(बात|बोलो|बोल|जवाब|reply)/
+        // Do not include जवाब/reply here — phrases like "हिंदी में जवाब दीजिए" are real questions.
+        /हिंदी\s*(में|me|mein|main)?\s*(बात|बोलो|बोल)\b/,
+        /हिन्दी\s*(में|me|mein|main)?\s*(बात|बोलो|बोल)\b/
     ];
     var SWITCH_TO_EN_PATTERNS = [
         /\b(switch|change|set|use)\s+(to\s+)?english\b/i,
@@ -3183,7 +3205,7 @@ window.VoiceMode = (function () {
         /\benglish\s+(please|plz|pls)\b/i,
         /\benglish\s+mode\b/i,
         /\b(turn|switch)\s+on\s+english\b/i,
-        /(अंग्रेज़ी|अंग्रेजी|इंग्लिश)\s*(में|me|mein|main)?\s*(बात|बोलो|बोल|जवाब|reply)/
+        /(अंग्रेज़ी|अंग्रेजी|इंग्लिश)\s*(में|me|mein|main)?\s*(बात|बोलो|बोल)\b/
     ];
 
     function intentSwitchLang(text) {
@@ -3237,7 +3259,9 @@ window.VoiceMode = (function () {
 
     function submitTranscript(text) {
         var newLang = intentSwitchLang(text);
-        if (newLang) {
+        // Only treat as a voice command when switching *to* another language. Same-language "switch"
+        // matches (e.g. हिंदी में जवाब…) must still go to the model; applying ack here drops the question.
+        if (newLang && newLang !== currentLang) {
             applyLangCommand(newLang);
             return;
         }
