@@ -45,7 +45,7 @@
     <title>DocuMind AI — Chat with your PDFs · AI Document Assistant</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=4" sizes="32x32">
     <link rel="apple-touch-icon" href="/static/favicon.png?v=4">
-    <link rel="stylesheet" href="/static/style.css?v=2">
+    <link rel="stylesheet" href="/static/style.css?v=3">
 </head>
 <body>
 
@@ -406,6 +406,19 @@
 
 <div id="voiceOverlay" class="voice-overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Voice mode">
     <button type="button" class="voice-overlay-close" id="voiceOverlayClose" onclick="closeVoiceMode()" aria-label="End voice chat">×</button>
+
+    <div class="voice-lang-bar" role="radiogroup" aria-label="Voice language">
+        <span class="voice-lang-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+        </span>
+        <button type="button" class="voice-lang-btn is-active" id="voiceLangEn" data-lang="en-US" role="radio" aria-checked="true" onclick="setVoiceLang('en-US')">English</button>
+        <button type="button" class="voice-lang-btn" id="voiceLangHi" data-lang="hi-IN" role="radio" aria-checked="false" onclick="setVoiceLang('hi-IN')">हिंदी</button>
+    </div>
+
     <div class="voice-stage">
         <div class="voice-orb" id="voiceOrb" data-state="idle">
             <span class="voice-orb-ring voice-orb-ring--1" aria-hidden="true"></span>

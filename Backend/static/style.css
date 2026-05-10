@@ -3813,6 +3813,80 @@ select,
     transform: scale(1.05);
 }
 
+.voice-lang-bar {
+    position: absolute;
+    top: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px 6px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    backdrop-filter: blur(10px) saturate(140%);
+    color: rgba(255, 255, 255, 0.86);
+    font-size: 13px;
+    line-height: 1;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+    z-index: 5;
+}
+.voice-lang-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-right: 2px;
+}
+.voice-lang-btn {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.78);
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
+    font-family: inherit;
+}
+.voice-lang-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+.voice-lang-btn.is-active {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+    color: #fff;
+    box-shadow:
+        0 4px 14px rgba(139, 92, 246, 0.45),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+    transform: translateY(-1px);
+}
+.voice-lang-btn.is-active:hover {
+    filter: brightness(1.05);
+}
+.voice-lang-btn:focus-visible {
+    outline: 2px solid rgba(167, 139, 250, 0.85);
+    outline-offset: 2px;
+}
+@media (max-width: 480px) {
+    .voice-lang-bar {
+        top: 14px;
+        font-size: 12px;
+        padding: 5px 6px 5px 10px;
+    }
+    .voice-lang-btn {
+        padding: 6px 11px;
+        font-size: 12px;
+    }
+}
+
 .voice-stage {
     display: flex;
     flex-direction: column;

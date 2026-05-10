@@ -2690,12 +2690,217 @@ window.VoiceMode = (function () {
     var awaitingReply = false;
     var preferredVoice = null;
 
-    var GREETINGS = [
+    var LANG_LS_KEY = "documind_voice_lang";
+    var currentLang = "en-US";
+    try {
+        var savedLang = localStorage.getItem(LANG_LS_KEY);
+        if (savedLang === "en-US" || savedLang === "hi-IN") currentLang = savedLang;
+    } catch (e) {}
+
+    // ---------- Barge-in (interrupt-while-speaking) state ----------
+    // We combine 3 signals so background voices / TV / bot's own echo CAN'T trigger an interrupt:
+    //   1) Voice Activity Detection (real RMS energy from the mic, calibrated to ambient)
+    //   2) Word-count + length thresholds on the transcript
+    //   3) Substring check against the bot's currently-spoken text (anti-echo)
+    var speakSession = 0;             // increments each new speech; old chunks self-abort
+    var currentSpokenText = "";       // the bot's currently-speaking text (for echo check)
+    var isBotSpeaking = false;
+    var interruptArmed = false;       // true while bot is speaking AND mic is open
+
+    // Web Audio VAD
+    var audioCtx = null;
+    var micStream = null;
+    var analyser = null;
+    var vadBuf = null;
+    var vadRaf = null;
+    var vadLastTs = 0;
+    var vadVoicedMs = 0;              // ms of continuous "above threshold"
+    var vadSilenceMs = 0;
+    var vadActive = false;            // true = real sustained speech happening NOW
+    var vadThreshold = 0.05;          // calibrated each session
+    var vadCalibrated = false;
+
+    var TRIVIAL_WORDS = /^(uh|um+|hm+|ah|oh|ok(ay)?|yes|yeah|yep|no|nope|right|sure|cool|haan|hai|ji|achha|accha|theek|thik|han|nahi|nahin|haa)\.?\??$/i;
+
+    function isTrivialUtterance(text) {
+        var s = String(text || "").trim();
+        if (!s) return true;
+        if (s.length < 4) return true;
+        if (TRIVIAL_WORDS.test(s)) return true;
+        return false;
+    }
+
+    function looksLikeEcho(text) {
+        if (!currentSpokenText) return false;
+        var u = String(text || "").toLowerCase().trim();
+        if (!u) return true;
+        var spoken = currentSpokenText.toLowerCase();
+        var words = u.split(/\s+/).filter(Boolean);
+        if (!words.length) return true;
+        var matched = 0;
+        for (var i = 0; i < words.length; i++) {
+            if (words[i].length >= 3 && spoken.indexOf(words[i]) !== -1) matched++;
+        }
+        // If most of the user's words appear in the bot's currently-speaking text, it's echo.
+        return (matched / words.length) >= 0.75;
+    }
+
+    function startVAD() {
+        if (audioCtx || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+        try {
+            navigator.mediaDevices.getUserMedia({
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+            }).then(function (stream) {
+                micStream = stream;
+                var Ctx = window.AudioContext || window.webkitAudioContext;
+                if (!Ctx) return;
+                audioCtx = new Ctx();
+                var source = audioCtx.createMediaStreamSource(stream);
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 1024;
+                analyser.smoothingTimeConstant = 0.55;
+                source.connect(analyser);
+                vadBuf = new Uint8Array(analyser.frequencyBinCount);
+
+                // Calibrate ambient noise for ~700ms before arming VAD.
+                var calStart = performance.now();
+                var calSum = 0, calN = 0;
+                function calTick() {
+                    if (!analyser) return;
+                    analyser.getByteTimeDomainData(vadBuf);
+                    var s = 0;
+                    for (var i = 0; i < vadBuf.length; i++) {
+                        var v = (vadBuf[i] - 128) / 128;
+                        s += v * v;
+                    }
+                    calSum += Math.sqrt(s / vadBuf.length);
+                    calN++;
+                    if (performance.now() - calStart < 700) {
+                        requestAnimationFrame(calTick);
+                    } else {
+                        var ambient = calSum / Math.max(1, calN);
+                        // Threshold: well above ambient, with a sane floor.
+                        // Real human speech near a laptop mic typically RMS 0.08–0.25.
+                        vadThreshold = Math.max(0.07, ambient * 3.5);
+                        vadCalibrated = true;
+                        vadLastTs = 0;
+                        loop();
+                    }
+                }
+                function loop() {
+                    if (!audioCtx || !analyser) return;
+                    analyser.getByteTimeDomainData(vadBuf);
+                    var s = 0;
+                    for (var i = 0; i < vadBuf.length; i++) {
+                        var v = (vadBuf[i] - 128) / 128;
+                        s += v * v;
+                    }
+                    var rms = Math.sqrt(s / vadBuf.length);
+                    var now = performance.now();
+                    var dt = vadLastTs ? Math.min(80, now - vadLastTs) : 16;
+                    vadLastTs = now;
+                    if (rms > vadThreshold) {
+                        vadVoicedMs += dt;
+                        vadSilenceMs = 0;
+                        // require ~280ms of sustained energy → real speech, not a click/cough/echo blip
+                        if (vadVoicedMs > 280) vadActive = true;
+                    } else {
+                        vadSilenceMs += dt;
+                        if (vadSilenceMs > 220) {
+                            vadVoicedMs = 0;
+                            vadActive = false;
+                        }
+                    }
+                    vadRaf = requestAnimationFrame(loop);
+                }
+                requestAnimationFrame(calTick);
+            }).catch(function (err) {
+                console.warn("VoiceMode: VAD getUserMedia denied/failed", err);
+            });
+        } catch (e) {
+            console.warn("VoiceMode: VAD init failed", e);
+        }
+    }
+
+    function stopVAD() {
+        if (vadRaf) { try { cancelAnimationFrame(vadRaf); } catch (e) {} }
+        vadRaf = null;
+        analyser = null;
+        vadBuf = null;
+        vadVoicedMs = 0;
+        vadSilenceMs = 0;
+        vadActive = false;
+        vadCalibrated = false;
+        if (micStream) {
+            try { micStream.getTracks().forEach(function (tr) { tr.stop(); }); } catch (e) {}
+            micStream = null;
+        }
+        if (audioCtx) {
+            try { audioCtx.close(); } catch (e) {}
+            audioCtx = null;
+        }
+    }
+
+    function interruptSpeech() {
+        speakSession++;       // any in-flight chunks will see a stale id and abort
+        isBotSpeaking = false;
+        interruptArmed = false;
+        currentSpokenText = "";
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+    }
+
+    /** Decide whether an ASR transcript during bot speech is a real interrupt.
+     *  Requires VAD-confirmed sustained voice + non-trivial text + not-echo. */
+    function isRealInterrupt(text, isFinal) {
+        if (!interruptArmed) return false;
+        var s = String(text || "").trim();
+        if (!s) return false;
+        if (isTrivialUtterance(s)) return false;
+        // Word + length thresholds (more permissive on final than interim).
+        var words = s.split(/\s+/).filter(Boolean);
+        var minWords = isFinal ? 2 : 3;
+        var minChars = isFinal ? 8 : 11;
+        if (words.length < minWords) return false;
+        if (s.length < minChars) return false;
+        if (looksLikeEcho(s)) return false;
+        // VAD gate: must currently be sustaining real-mic energy.
+        // If VAD didn't initialize (permission denied), fall back to text-only checks (still safe).
+        if (vadCalibrated && !vadActive) return false;
+        return true;
+    }
+
+    var GREETINGS_EN = [
         "Hi! I'm DocuMind. How can I help you today?",
         "Hello! What can I help you find in your documents?",
         "Hey there! Ask me anything about the documents you've uploaded.",
         "Hi! I'm ready when you are — what would you like to know?"
     ];
+    var GREETINGS_HI = [
+        "नमस्ते! मैं DocuMind हूँ। मैं आपकी कैसे मदद कर सकता हूँ?",
+        "हैलो! आप अपने डॉक्युमेंट से क्या जानना चाहेंगे?",
+        "नमस्कार! जो भी सवाल हो, अपने अपलोड किए हुए डॉक्युमेंट के बारे में पूछ सकते हैं।",
+        "हाय! बताइए, क्या जानना चाहेंगे?"
+    ];
+
+    var STR = {
+        listening: { "en-US": "Listening…", "hi-IN": "सुन रहा हूँ…" },
+        speaking:  { "en-US": "Speaking…",  "hi-IN": "बोल रहा हूँ…" },
+        thinking:  { "en-US": "Thinking…",  "hi-IN": "सोच रहा हूँ…" },
+        tap_speak: { "en-US": "Tap to speak, or just talk…", "hi-IN": "बोलिए, मैं सुन रहा हूँ…" },
+        muted:     { "en-US": "Mic muted. Tap the mic to unmute.", "hi-IN": "माइक म्यूट है। अनम्यूट करने के लिए टैप करें।" },
+        no_catch:  { "en-US": "Didn't catch that — try again.", "hi-IN": "समझ नहीं आया — फिर से बोलिए।" },
+        mic_err:   { "en-US": "Mic error. Tap the mic to try again.", "hi-IN": "माइक में दिक्कत है। फिर से कोशिश करें।" },
+        mic_deny:  { "en-US": "Mic permission denied. Please allow microphone access.", "hi-IN": "माइक की अनुमति नहीं मिली। कृपया अनुमति दें।" },
+        switched:  { "en-US": "Switched to English.", "hi-IN": "हिंदी पर स्विच किया गया।" },
+        not_supp:  { "en-US": "Speech input isn't supported in this browser. Type instead, or use Chrome/Edge.", "hi-IN": "इस ब्राउज़र में वॉइस इनपुट सपोर्ट नहीं है। Chrome या Edge इस्तेमाल करें।" },
+        couldnt:   { "en-US": "Couldn't send. Tap × to close.", "hi-IN": "भेज नहीं पाया। बंद करने के लिए × दबाएँ।" },
+        error:     { "en-US": "Something went wrong.", "hi-IN": "कुछ गड़बड़ हो गई।" }
+    };
+
+    function t(key) {
+        var bag = STR[key] || {};
+        return bag[currentLang] || bag["en-US"] || "";
+    }
 
     function el(id) { return document.getElementById(id); }
 
@@ -2709,22 +2914,32 @@ window.VoiceMode = (function () {
         if (s) s.textContent = text;
     }
 
-    function pickVoice() {
+    function detectScriptLang(text) {
+        return /[\u0900-\u097F]/.test(text || "") ? "hi-IN" : "en-US";
+    }
+
+    function pickVoiceForLang(lang) {
         if (!hasTTS) return null;
         var voices = window.speechSynthesis.getVoices() || [];
         if (!voices.length) return null;
         function score(v) {
             var n = (v.name || "").toLowerCase();
-            var lang = (v.lang || "").toLowerCase();
+            var vl = (v.lang || "").toLowerCase();
             var s = 0;
-            if (/natural|neural|premium|enhanced/i.test(n)) s += 120;
-            if (/microsoft/i.test(n) && (/aria|jenny|guy|michelle|sonia|ashley|ryan|olivia|emma/i.test(n))) s += 70;
-            if (/google/i.test(n) && (/english.*female|us english|uk english female/i.test(n))) s += 65;
-            if (/samantha|karen|daniel|zira|hazel|alex/i.test(n)) s += 55;
-            if (/compact/i.test(n)) s -= 40;
-            if (/robot|novelty/i.test(n)) s -= 80;
-            if (/^en-us|^en_us|^en-us-/i.test(lang)) s += 35;
-            else if (lang.indexOf("en") === 0) s += 18;
+            if (/natural|neural|premium|enhanced|online/i.test(n)) s += 120;
+            if (/compact|novelty|robot/i.test(n)) s -= 70;
+            if (lang === "hi-IN") {
+                if (/^hi(-|_)/.test(vl)) s += 220;
+                if (/microsoft/i.test(n) && /(swara|madhur|prabhat|kavya|kunal|rehaan|ananya|aarav|hemant|heera|kalpana)/i.test(n)) s += 90;
+                if (/google/i.test(n) && /(hindi|हिन्दी|हिंदी)/i.test(n)) s += 90;
+                if (/hindi/i.test(n)) s += 40;
+            } else {
+                if (/^en(-|_)/.test(vl)) s += 100;
+                if (/^en-us|^en_us/.test(vl)) s += 25;
+                if (/microsoft/i.test(n) && /(aria|jenny|guy|michelle|sonia|ashley|ryan|olivia|emma)/i.test(n)) s += 70;
+                if (/google/i.test(n) && /(english.*female|us english|uk english)/i.test(n)) s += 65;
+                if (/samantha|karen|daniel|zira|hazel|alex/i.test(n)) s += 55;
+            }
             return s;
         }
         var best = null;
@@ -2739,31 +2954,36 @@ window.VoiceMode = (function () {
         return best || voices[0];
     }
 
-    function refreshVoices() {
-        if (!hasTTS) return;
-        preferredVoice = pickVoice();
+    function pickVoice() {
+        return pickVoiceForLang(currentLang);
     }
 
-    /** Split reply into short phrases for calmer, more natural pacing (browser TTS). */
+    function refreshVoices() {
+        if (!hasTTS) return;
+        preferredVoice = pickVoiceForLang(currentLang);
+    }
+
+    /** Split reply into short phrases for calmer, more natural pacing (browser TTS).
+     *  Handles English (.!?) and Hindi danda (।) sentence terminators. */
     function splitForSpeech(text) {
-        var t = String(text || "").replace(/\s+/g, " ").trim();
-        if (!t) return [];
-        if (t.length < 100) return [t];
-        var chunks = t.match(/[^.!?]+[.!?]+|[^.!?]+$/g);
-        if (!chunks || chunks.length <= 1) return [t];
+        var src = String(text || "").replace(/\s+/g, " ").trim();
+        if (!src) return [];
+        if (src.length < 100) return [src];
+        var chunks = src.match(/[^.!?।]+[.!?।]+|[^.!?।]+$/g);
+        if (!chunks || chunks.length <= 1) return [src];
         var out = [];
         for (var i = 0; i < chunks.length; i++) {
             var c = chunks[i].trim();
             if (c) out.push(c);
         }
-        return out.length ? out : [t];
+        return out.length ? out : [src];
     }
 
     function ensureRecognition() {
         if (!SR) return null;
         if (recognition) return recognition;
         recognition = new SR();
-        recognition.lang = "en-US";
+        recognition.lang = currentLang;
         recognition.interimResults = true;
         recognition.continuous = false;
         recognition.maxAlternatives = 1;
@@ -2773,7 +2993,7 @@ window.VoiceMode = (function () {
         recognition.onstart = function () {
             listening = true;
             setOrbState("listening");
-            setStatus("Listening…");
+            setStatus(t("listening"));
         };
         recognition.onresult = function (e) {
             var interim = "";
@@ -2784,23 +3004,34 @@ window.VoiceMode = (function () {
                 else interim += r[0].transcript;
             }
             var shown = (lastFinal + interim).trim();
+
+            // Barge-in: if the bot is speaking AND this is real user speech (VAD + text gates),
+            // cut the bot off immediately. The final transcript will be submitted via onend.
+            if (isBotSpeaking && shown) {
+                if (isRealInterrupt(shown, !!lastFinal)) {
+                    interruptSpeech();
+                    setOrbState("listening");
+                    setStatus(t("listening"));
+                }
+            }
+
             if (shown) setStatus("\u201C" + shown + "\u201D");
         };
         recognition.onerror = function (ev) {
             listening = false;
             if (ev && (ev.error === "no-speech" || ev.error === "aborted")) {
                 if (active && !muted && !awaitingReply) {
-                    setStatus("Didn't catch that — try again.");
+                    setStatus(t("no_catch"));
                     safeStart(800);
                 }
                 return;
             }
             if (ev && ev.error === "not-allowed") {
-                setStatus("Mic permission denied. Please allow microphone access.");
+                setStatus(t("mic_deny"));
                 setOrbState("muted");
                 return;
             }
-            setStatus("Mic error. Tap the mic to try again.");
+            setStatus(t("mic_err"));
             setOrbState("idle");
         };
         recognition.onend = function () {
@@ -2818,6 +3049,8 @@ window.VoiceMode = (function () {
     }
 
     function safeStart(delayMs) {
+        // Mic may run during bot speech (for barge-in). It must NOT run while we're waiting
+        // for the LLM (no useful input there) or while muted.
         if (!active || muted || awaitingReply) return;
         setTimeout(function () {
             if (!active || muted || awaitingReply) return;
@@ -2848,77 +3081,190 @@ window.VoiceMode = (function () {
 
         var chunks = splitForSpeech(clean);
         var idx = 0;
+        var session = ++speakSession;
+        currentSpokenText = clean;
+        isBotSpeaking = true;
+
+        function finish() {
+            // Only clear "speaking" flags if this session is still the current one.
+            if (session === speakSession) {
+                isBotSpeaking = false;
+                interruptArmed = false;
+                currentSpokenText = "";
+            }
+            if (onDone) onDone();
+        }
 
         function speakChunk() {
-            if (!active) {
-                if (onDone) onDone();
+            if (!active || session !== speakSession) {
+                finish();
                 return;
             }
             if (idx >= chunks.length) {
-                if (onDone) onDone();
+                finish();
                 return;
             }
-            var u = new SpeechSynthesisUtterance(chunks[idx]);
-            u.lang = "en-US";
-            u.rate = 0.92;
-            u.pitch = 0.98;
+            var chunkText = chunks[idx];
+            var chunkLang = detectScriptLang(chunkText);
+            var u = new SpeechSynthesisUtterance(chunkText);
+            u.lang = chunkLang;
+            if (chunkLang === "hi-IN") {
+                u.rate = 0.96;
+                u.pitch = 1.0;
+            } else {
+                u.rate = 0.92;
+                u.pitch = 0.98;
+            }
             u.volume = 1;
-            if (!preferredVoice) preferredVoice = pickVoice();
-            if (preferredVoice) u.voice = preferredVoice;
+            var v = pickVoiceForLang(chunkLang);
+            if (v) u.voice = v;
 
             setOrbState("speaking");
-            setStatus("Speaking…");
+            setStatus(t("speaking"));
 
+            u.onstart = function () {
+                if (session !== speakSession) return;
+                // Arm the barge-in detector once the bot's voice is actually playing.
+                interruptArmed = true;
+                // Reset VAD counters so leftover energy from the previous chunk doesn't false-trigger.
+                vadVoicedMs = 0;
+                vadSilenceMs = 0;
+                vadActive = false;
+            };
             u.onend = function () {
+                if (session !== speakSession) return;
                 idx++;
                 if (idx < chunks.length) {
                     setTimeout(speakChunk, 140);
-                } else if (onDone) {
-                    onDone();
+                } else {
+                    finish();
                 }
             };
             u.onerror = function () {
+                if (session !== speakSession) return;
                 idx++;
                 if (idx < chunks.length) {
                     setTimeout(speakChunk, 80);
-                } else if (onDone) {
-                    onDone();
+                } else {
+                    finish();
                 }
             };
             try {
                 window.speechSynthesis.speak(u);
             } catch (e) {
-                if (onDone) onDone();
+                finish();
             }
         }
 
         speakChunk();
     }
 
+    /** Voice-command language switch: lets the user say "talk in hindi" / "english mein baat karo"
+     *  to flip the recognizer + voice + UI pill, without sending the command to the LLM. */
+    var SWITCH_TO_HI_PATTERNS = [
+        /\b(switch|change|set|use)\s+(to\s+)?hindi\b/i,
+        /\b(speak|talk|reply|answer|say|chat|respond)\s+(in\s+)?hindi\b/i,
+        /\bhindi\s+(me(in)?|main)\s+(baat|bolo|bol|baat\s*kar(o|en|ein|ungi|unga)|reply|answer|jawab)\b/i,
+        /\b(can\s+you|please|plz|pls)?\s*(speak|talk|reply)\s+hindi\b/i,
+        /\bhindi\s+(please|plz|pls)\b/i,
+        /\bhindi\s+mode\b/i,
+        /\b(turn|switch)\s+on\s+hindi\b/i,
+        /हिंदी\s*(में|me|mein|main)?\s*(बात|बोलो|बोल|जवाब|reply)/,
+        /हिन्दी\s*(में|me|mein|main)?\s*(बात|बोलो|बोल|जवाब|reply)/
+    ];
+    var SWITCH_TO_EN_PATTERNS = [
+        /\b(switch|change|set|use)\s+(to\s+)?english\b/i,
+        /\b(speak|talk|reply|answer|say|chat|respond)\s+(in\s+)?english\b/i,
+        /\benglish\s+(me(in)?|main)\s+(baat|bolo|bol|baat\s*kar(o|en|ein|ungi|unga)|reply|answer|jawab)\b/i,
+        /\b(can\s+you|please|plz|pls)?\s*(speak|talk|reply)\s+english\b/i,
+        /\benglish\s+(please|plz|pls)\b/i,
+        /\benglish\s+mode\b/i,
+        /\b(turn|switch)\s+on\s+english\b/i,
+        /(अंग्रेज़ी|अंग्रेजी|इंग्लिश)\s*(में|me|mein|main)?\s*(बात|बोलो|बोल|जवाब|reply)/
+    ];
+
+    function intentSwitchLang(text) {
+        var s = String(text || "").trim();
+        if (!s) return null;
+        if (s.length > 80) return null;
+        var i;
+        for (i = 0; i < SWITCH_TO_HI_PATTERNS.length; i++) {
+            if (SWITCH_TO_HI_PATTERNS[i].test(s)) return "hi-IN";
+        }
+        for (i = 0; i < SWITCH_TO_EN_PATTERNS.length; i++) {
+            if (SWITCH_TO_EN_PATTERNS[i].test(s)) return "en-US";
+        }
+        return null;
+    }
+
+    var ACK_HI = [
+        "ठीक है, अब मैं हिंदी में बात करूँगी।",
+        "बिल्कुल! अब हिंदी में बात करते हैं।",
+        "ओके, हिंदी मोड चालू कर दिया।",
+        "जी हाँ, अब आगे की बातचीत हिंदी में होगी।"
+    ];
+    var ACK_EN = [
+        "Sure, I'll speak in English now.",
+        "Got it — switching to English.",
+        "Okay, English it is. What would you like to ask?",
+        "Done — we'll continue in English."
+    ];
+
+    function applyLangCommand(newLang) {
+        setLang(newLang);
+        var pool = newLang === "hi-IN" ? ACK_HI : ACK_EN;
+        var ack = pool[Math.floor(Math.random() * pool.length)];
+        interruptSpeech();
+        if (recognition) {
+            try { recognition.abort(); } catch (e) {}
+            recognition = null;
+        }
+        listening = false;
+        awaitingReply = true;
+        setOrbState("speaking");
+        setStatus(ack);
+        speak(ack, function () {
+            awaitingReply = false;
+            if (!active) return;
+            setOrbState("idle");
+            setStatus(t("listening"));
+            safeStart(220);
+        });
+    }
+
     function submitTranscript(text) {
+        var newLang = intentSwitchLang(text);
+        if (newLang) {
+            applyLangCommand(newLang);
+            return;
+        }
         var input = el("messageInput");
         if (!input) return;
         input.value = text;
         awaitingReply = true;
         setOrbState("thinking");
-        setStatus("Thinking…");
+        setStatus(t("thinking"));
         try {
             sendMessage();
         } catch (e) {
             console.error(e);
             awaitingReply = false;
-            setStatus("Couldn't send. Tap × to close.");
+            setStatus(t("couldnt"));
         }
     }
 
     function handleAssistantReply(text) {
         awaitingReply = false;
         if (!active) return;
+        // Open the mic NOW so the user can interrupt mid-reply.
+        // (The interrupt detector runs only while `interruptArmed` is true → set in u.onstart.)
+        if (!muted) safeStart(120);
         speak(text, function () {
             if (!active) return;
             setOrbState("idle");
-            setStatus("Tap to speak, or just talk…");
-            safeStart(250);
+            setStatus(t("tap_speak"));
+            // Recognition is likely already running; safeStart is a no-op if so.
+            safeStart(150);
         });
     }
 
@@ -2926,25 +3272,61 @@ window.VoiceMode = (function () {
         awaitingReply = false;
         if (!active) return;
         setOrbState("idle");
-        setStatus(msg || "Something went wrong.");
+        setStatus(msg || t("error"));
         safeStart(800);
     }
 
     function startGreeting() {
         if (!active) return;
         if (hasTTS) refreshVoices();
-        var greeting = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
+        var pool = currentLang === "hi-IN" ? GREETINGS_HI : GREETINGS_EN;
+        var greeting = pool[Math.floor(Math.random() * pool.length)];
         setStatus(greeting);
         speak(greeting, function () {
             if (!active) return;
             if (!SR) {
-                setStatus("Speech input isn't supported in this browser. Type instead, or use Chrome/Edge.");
+                setStatus(t("not_supp"));
                 return;
             }
             setOrbState("idle");
-            setStatus("Listening…");
+            setStatus(t("listening"));
             safeStart(150);
         });
+    }
+
+    function syncLangButtons() {
+        var btns = document.querySelectorAll(".voice-lang-btn");
+        for (var i = 0; i < btns.length; i++) {
+            var b = btns[i];
+            var on = b.getAttribute("data-lang") === currentLang;
+            b.classList.toggle("is-active", on);
+            b.setAttribute("aria-checked", on ? "true" : "false");
+        }
+    }
+
+    function setLang(lang) {
+        if (lang !== "en-US" && lang !== "hi-IN") return;
+        if (lang === currentLang) {
+            syncLangButtons();
+            return;
+        }
+        currentLang = lang;
+        try { localStorage.setItem(LANG_LS_KEY, lang); } catch (e) {}
+        syncLangButtons();
+
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+        if (recognition) {
+            try { recognition.abort(); } catch (e) {}
+            recognition = null;
+        }
+        listening = false;
+        preferredVoice = null;
+        refreshVoices();
+
+        if (active) {
+            setStatus(t("switched"));
+            if (!awaitingReply && !muted) safeStart(450);
+        }
     }
 
     function open() {
@@ -2961,6 +3343,8 @@ window.VoiceMode = (function () {
         muted = false;
         awaitingReply = false;
         setOrbState("idle");
+        syncLangButtons();
+        startVAD();
         var muteBtn = el("voiceMuteBtn");
         if (muteBtn) muteBtn.classList.remove("is-muted");
 
@@ -2984,8 +3368,9 @@ window.VoiceMode = (function () {
         active = false;
         awaitingReply = false;
         listening = false;
-        try { window.speechSynthesis.cancel(); } catch (e) {}
+        interruptSpeech();
         try { if (recognition) recognition.abort(); } catch (e) {}
+        stopVAD();
         var overlay = el("voiceOverlay");
         if (overlay) {
             overlay.classList.remove("is-open");
@@ -3001,10 +3386,10 @@ window.VoiceMode = (function () {
         if (muted) {
             stopListening();
             setOrbState("muted");
-            setStatus("Mic muted. Tap the mic to unmute.");
+            setStatus(t("muted"));
         } else {
             setOrbState("idle");
-            setStatus("Listening…");
+            setStatus(t("listening"));
             safeStart(150);
         }
     }
@@ -3017,6 +3402,8 @@ window.VoiceMode = (function () {
         open: open,
         close: close,
         toggleMute: toggleMute,
+        setLang: setLang,
+        getLang: function () { return currentLang; },
         isActive: function () { return active; },
         handleAssistantReply: handleAssistantReply,
         handleError: handleError
@@ -3031,4 +3418,7 @@ function closeVoiceMode() {
 }
 function toggleVoiceMute() {
     if (window.VoiceMode) window.VoiceMode.toggleMute();
+}
+function setVoiceLang(lang) {
+    if (window.VoiceMode) window.VoiceMode.setLang(lang);
 }
